@@ -17,7 +17,9 @@
       </StackPanel>
       <StackPanel>
         <TextBlock Text="Setup" FontSize="26" FontWeight="Bold" />
-        <TextBlock Text="{Binding StatusText}" Opacity="0.75" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding StatusText}" Opacity="0.75" TextWrapping="Wrap"
+                   MaxLines="3" TextTrimming="CharacterEllipsis"
+                   ToolTip.Tip="{Binding StatusText}" />
       </StackPanel>
     </DockPanel>
 
@@ -47,7 +49,9 @@
                     </Border>
                     <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
                   </DockPanel>
-                  <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" FontSize="12" Opacity="0.75" />
+                  <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" FontSize="12" Opacity="0.75"
+                             MaxLines="4" TextTrimming="CharacterEllipsis"
+                             ToolTip.Tip="{Binding Summary}" />
                   <Button Content="Bypass this check"
                           Command="{Binding BypassCommand}"
                           IsVisible="{Binding CanBypass}"

@@ -52,7 +52,7 @@ public sealed class WslKernelStep(IWslBackend wsl) : ISetupStep
                         WslCommands.Management(["--update", "--web-download"]), exec.Output, token);
                     return result.Succeeded
                         ? ActionResult.Success()
-                        : ActionResult.Failure($"wsl --update failed: {result.Stderr}{result.Stdout}".Trim());
+                        : ActionResult.Failure($"wsl --update failed: {TextUtil.Condense(result.Stderr + result.Stdout)}");
                 }),
             new(
                 ActionId: "wsl.kernel.default2",
@@ -67,7 +67,7 @@ public sealed class WslKernelStep(IWslBackend wsl) : ISetupStep
                         WslCommands.Management(["--set-default-version", "2"]), exec.Output, token);
                     return result.Succeeded
                         ? ActionResult.Success()
-                        : ActionResult.Failure($"wsl --set-default-version failed: {result.Stderr}{result.Stdout}".Trim());
+                        : ActionResult.Failure($"wsl --set-default-version failed: {TextUtil.Condense(result.Stderr + result.Stdout)}");
                 }),
         };
 

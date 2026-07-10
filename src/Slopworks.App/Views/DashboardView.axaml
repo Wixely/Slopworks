@@ -35,7 +35,9 @@
                 </Border>
                 <StackPanel Grid.Column="1" Spacing="3">
                   <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Opacity="0.8" FontSize="13" />
+                  <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Opacity="0.8" FontSize="13"
+                             MaxLines="4" TextTrimming="CharacterEllipsis"
+                             ToolTip.Tip="{Binding Summary}" />
                   <Button Content="Bypass this check"
                           Command="{Binding BypassCommand}"
                           IsVisible="{Binding CanBypass}"

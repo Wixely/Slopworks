@@ -43,32 +43,43 @@ public sealed class WslFeatureStep(IWslBackend wsl) : ISetupStep
 
     public Task<IReadOnlyList<PlannedAction>> PlanAsync(StepContext ctx, StepDetection detection, CancellationToken ct)
     {
+        // The legacy inbox wsl.exe predates --no-distribution; its supported upgrade path to
+        // modern WSL is --update --web-download (which also skips the Microsoft Store).
+        var isLegacyUpgrade = detection.State == StepState.Partial;
+
+        IReadOnlyList<string> args = isLegacyUpgrade
+            ? ["--update", "--web-download"]
+            : ["--install", "--no-distribution"];
+
         var action = new PlannedAction(
             ActionId: "wsl.feature.install",
             StepId: Id,
             Kind: ActionKind.ExecuteElevated,
-            Description: "Install WSL 2 (no default distribution)",
-            Detail: "wsl.exe --install --no-distribution",
+            Description: isLegacyUpgrade
+                ? "Upgrade the legacy inbox WSL to modern WSL 2"
+                : "Install WSL 2 (no default distribution)",
+            Detail: $"wsl.exe {string.Join(' ', args)}",
             InsideSlopworksRoot: false,
             Execute: async (exec, token) =>
             {
                 var result = await exec.Processes.RunAsync(
-                    WslCommands.Management(["--install", "--no-distribution"]) with { RequiresElevation = true },
+                    WslCommands.Management(args) with { RequiresElevation = true },
                     exec.Output, token);
 
                 if (!result.Succeeded)
                 {
                     return ActionResult.Failure(
-                        $"wsl --install failed (exit {result.ExitCode}): {Truncate(result.Stderr + result.Stdout)}");
+                        $"wsl {args[0]} failed (exit {result.ExitCode}): {TextUtil.Condense(result.Stderr + result.Stdout)}");
                 }
 
-                return ActionResult.NeedsReboot("WSL installed. Windows needs a restart to finish enabling it.");
+                // Upgrading in place doesn't need a reboot; first-time feature enablement does.
+                return isLegacyUpgrade
+                    ? ActionResult.Success("Modern WSL installed over the legacy inbox version.")
+                    : ActionResult.NeedsReboot("WSL installed. Windows needs a restart to finish enabling it.");
             });
 
         return Task.FromResult<IReadOnlyList<PlannedAction>>([action]);
     }
-
-    private static string Truncate(string text) => text.Length <= 500 ? text.Trim() : text[..500].Trim() + "…";
 }
 
 /// <summary>Builders for wsl.exe invocations with the correct output encoding.</summary>

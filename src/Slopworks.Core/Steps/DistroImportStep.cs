@@ -111,7 +111,7 @@ public sealed class DistroImportStep(IWslBackend wsl) : ISetupStep
 
         return result.Succeeded
             ? ActionResult.Success($"Distro '{SlopworksPaths.DistroName}' imported.")
-            : ActionResult.Failure($"wsl --import failed: {result.Stderr}{result.Stdout}".Trim());
+            : ActionResult.Failure($"wsl --import failed: {TextUtil.Condense(result.Stderr + result.Stdout)}");
     }
 
     /// <summary>The verified tarball from the download step (marker present), newest first.</summary>
