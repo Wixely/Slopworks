@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Slopworks App",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/Slopworks.App/bin/Debug/net10.0/Slopworks.App.exe",
+      "cwd": "${workspaceFolder}/src/Slopworks.App",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    },
+    {
+      "name": "Attach to Slopworks",
+      "type": "coreclr",
+      "request": "attach",
+      "processName": "Slopworks.App"
+    }
+  ]
+}
