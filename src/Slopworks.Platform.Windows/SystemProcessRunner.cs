@@ -24,6 +24,7 @@ public sealed class SystemProcessRunner : IProcessRunner
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            RedirectStandardInput = spec.StdinText is not null,
             CreateNoWindow = true,
             WorkingDirectory = spec.WorkingDir ?? "",
             StandardOutputEncoding = spec.StdoutEncoding ?? Encoding.UTF8,
@@ -64,6 +65,12 @@ public sealed class SystemProcessRunner : IProcessRunner
         process.Start();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
+
+        if (spec.StdinText is not null)
+        {
+            await process.StandardInput.WriteAsync(spec.StdinText.AsMemory(), ct);
+            process.StandardInput.Close();
+        }
 
         await using var killOnCancel = ct.Register(() =>
         {

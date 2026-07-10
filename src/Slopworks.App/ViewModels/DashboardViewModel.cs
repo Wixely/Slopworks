@@ -49,6 +49,16 @@ public partial class DashboardViewModel(SlopworksHost host) : ObservableObject
                 if (items.TryGetValue(stepId, out var item))
                     item.Update(detection);
             }
+
+            // A pending reboot resolves itself once the step it was waiting on detects Ok.
+            if (host.Journal.Data.PendingReboot is { } pending
+                && results.TryGetValue(pending.AfterStep, out var afterReboot)
+                && afterReboot.State == StepState.Ok)
+            {
+                host.Journal.Data.PendingReboot = null;
+                await host.Journal.SaveAsync();
+                host.ShellIntegration.RemoveResumeOnStartup();
+            }
         }
         catch (Exception ex)
         {

@@ -52,16 +52,14 @@ public sealed class WslFeatureStep(IWslBackend wsl) : ISetupStep
             InsideSlopworksRoot: false,
             Execute: async (exec, token) =>
             {
-                // Until the elevated-worker relaunch lands (Phase 4), this runs in-process and
-                // relies on the app itself being elevated; wsl.exe fails cleanly when it is not.
                 var result = await exec.Processes.RunAsync(
-                    WslCommands.Management(["--install", "--no-distribution"]), exec.Output, token);
+                    WslCommands.Management(["--install", "--no-distribution"]) with { RequiresElevation = true },
+                    exec.Output, token);
 
                 if (!result.Succeeded)
                 {
                     return ActionResult.Failure(
-                        "wsl --install failed (this usually needs administrator rights — " +
-                        $"restart Slopworks as administrator). Output: {Truncate(result.Stderr + result.Stdout)}");
+                        $"wsl --install failed (exit {result.ExitCode}): {Truncate(result.Stderr + result.Stdout)}");
                 }
 
                 return ActionResult.NeedsReboot("WSL installed. Windows needs a restart to finish enabling it.");

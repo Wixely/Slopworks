@@ -10,6 +10,7 @@ using Slopworks.Core.State;
 using Slopworks.Core.Steps;
 using Slopworks.Platform.Abstractions;
 using Slopworks.Platform.Windows;
+using Slopworks.Platform.Windows.Elevation;
 using Slopworks.Platform.Windows.Wsl;
 
 namespace Slopworks.App;
@@ -30,6 +31,7 @@ public sealed class SlopworksHost
     public required ICommandLog CommandLog { get; init; }
     public required IArtifactResolver Resolver { get; init; }
     public required Downloader Downloader { get; init; }
+    public required IShellIntegration ShellIntegration { get; init; }
 
     /// <summary>Non-null when the current mode is safe; the UI drains its Pending channel.</summary>
     public InteractiveGate? InteractiveGate { get; private set; }
@@ -42,7 +44,8 @@ public sealed class SlopworksHost
         var config = ConfigStore.LoadOrCreate(paths);
         var logger = new FileLoggerProvider(paths.LogsDir).CreateLogger("Slopworks");
         var commandLog = new FileCommandLog(paths.LogsDir);
-        var runner = new SystemProcessRunner();
+        var direct = new SystemProcessRunner();
+        var runner = new CompositeProcessRunner(direct, new ElevatedProcessRunner(paths.ElevatedDir));
         var probes = new RecordingProcessRunner(runner, commandLog, "probe", "read-only");
         var journal = FileStateJournal.Load(paths.JournalFile);
         var http = SlopworksHttpClient.Create(config.Network);
@@ -59,6 +62,7 @@ public sealed class SlopworksHost
             CommandLog = commandLog,
             Resolver = new ArtifactResolver(config, journal, http, logger),
             Downloader = new Downloader(http),
+            ShellIntegration = new WindowsShellIntegration(runner),
         };
     }
 

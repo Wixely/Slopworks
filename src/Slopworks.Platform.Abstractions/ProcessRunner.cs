@@ -13,7 +13,8 @@ public sealed record ProcessSpec(
     string? WorkingDir = null,
     Encoding? StdoutEncoding = null,
     IReadOnlyDictionary<string, string>? Env = null,
-    bool RequiresElevation = false)
+    bool RequiresElevation = false,
+    string? StdinText = null)
 {
     /// <summary>Human-readable command line, shown verbatim on confirmation cards and in logs.</summary>
     public string CommandLineDisplay => Args.Count == 0

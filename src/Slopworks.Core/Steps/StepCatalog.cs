@@ -17,7 +17,8 @@ public static class StepCatalog
         new WslFeatureStep(wsl),
         new WslKernelStep(wsl),
         new RootfsDownloadStep(resolver, downloader),
-        // Phase 4+: wsl.import, distro.base, distro.podman, distro.nvidia,
+        new DistroImportStep(wsl),
+        // Phase 5+: distro.base, distro.podman, distro.nvidia,
         // image.pull, gpu.smoke, vllm.smoke
     ];
 }

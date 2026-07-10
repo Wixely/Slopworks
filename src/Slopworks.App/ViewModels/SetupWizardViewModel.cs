@@ -111,6 +111,15 @@ public partial class SetupWizardViewModel(SlopworksHost host) : ObservableObject
     [RelayCommand]
     private void Cancel() => _cts?.Cancel();
 
+    /// <summary>User clicked "Restart now" on the reboot banner — that click is the consent.</summary>
+    [RelayCommand]
+    private async Task RestartNowAsync()
+    {
+        host.ShellIntegration.InstallResumeOnStartup();
+        StatusText = "Restarting Windows in a few seconds… Slopworks reopens after login.";
+        await host.ShellIntegration.RequestRebootAsync(CancellationToken.None);
+    }
+
     private async Task DrainApprovalsAsync(InteractiveGate gate, CancellationToken ct)
     {
         await foreach (var pending in gate.Pending.ReadAllAsync(ct))
