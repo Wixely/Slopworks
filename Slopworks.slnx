@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Slopworks.App/Slopworks.App.csproj" />
     <Project Path="src/Slopworks.Core/Slopworks.Core.csproj" />
     <Project Path="src/Slopworks.Platform.Abstractions/Slopworks.Platform.Abstractions.csproj" />
     <Project Path="src/Slopworks.Platform.Windows/Slopworks.Platform.Windows.csproj" />

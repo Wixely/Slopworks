@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Slopworks.Platform.Abstractions\Slopworks.Platform.Abstractions.csproj" />
+    <ProjectReference Include="..\Slopworks.Core\Slopworks.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,11 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Slopworks.App.ViewModels"
+        xmlns:views="using:Slopworks.App.Views"
+        x:Class="Slopworks.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Slopworks"
+        Width="960" Height="680"
+        WindowStartupLocation="CenterScreen">
+  <views:DashboardView DataContext="{Binding Dashboard}" />
+</Window>

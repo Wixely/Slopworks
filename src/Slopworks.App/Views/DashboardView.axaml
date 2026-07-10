@@ -1,0 +1,56 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Slopworks.App.ViewModels"
+             x:Class="Slopworks.App.Views.DashboardView"
+             x:DataType="vm:DashboardViewModel">
+  <DockPanel Margin="20">
+
+    <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,16">
+      <DockPanel>
+        <Button DockPanel.Dock="Right"
+                Content="Refresh"
+                Command="{Binding RefreshCommand}"
+                VerticalAlignment="Top" />
+        <TextBlock Text="Slopworks" FontSize="26" FontWeight="Bold" />
+      </DockPanel>
+      <TextBlock Text="{Binding ProfileSummary}" Opacity="0.75" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding RootSummary}" Opacity="0.55" FontSize="12" />
+    </StackPanel>
+
+    <ScrollViewer>
+      <ItemsControl ItemsSource="{Binding Steps}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:StepStatusItemViewModel">
+            <Border Margin="0,4"
+                    Padding="14,10"
+                    CornerRadius="8"
+                    Background="#22FFFFFF">
+              <Grid ColumnDefinitions="90,*">
+                <Border Background="{Binding StateBrush}"
+                        CornerRadius="10"
+                        Padding="10,3"
+                        VerticalAlignment="Top"
+                        HorizontalAlignment="Left">
+                  <TextBlock Text="{Binding State}" FontSize="12" FontWeight="SemiBold" Foreground="White" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="3">
+                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Opacity="0.8" FontSize="13" />
+                  <Expander Header="Evidence"
+                            IsVisible="{Binding Evidence, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="{Binding Evidence}"
+                               FontFamily="Consolas,Menlo,monospace"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Opacity="0.7" />
+                  </Expander>
+                </StackPanel>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+  </DockPanel>
+</UserControl>

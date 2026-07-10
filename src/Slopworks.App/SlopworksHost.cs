@@ -1,0 +1,94 @@
+using Microsoft.Extensions.Logging;
+using Slopworks.Core.Actions;
+using Slopworks.Core.Config;
+using Slopworks.Core.Engine;
+using Slopworks.Core.Logging;
+using Slopworks.Core.Platform;
+using Slopworks.Core.State;
+using Slopworks.Core.Steps;
+using Slopworks.Platform.Abstractions;
+using Slopworks.Platform.Windows;
+using Slopworks.Platform.Windows.Wsl;
+
+namespace Slopworks.App;
+
+/// <summary>
+/// Composition root. Platform-specific services are chosen here; the Linux port swaps the
+/// registrations in Create() and nothing else.
+/// </summary>
+public sealed class SlopworksHost
+{
+    public required SlopworksPaths Paths { get; init; }
+    public required SlopworksConfig Config { get; init; }
+    public required ILogger Logger { get; init; }
+    public required IStateJournal Journal { get; init; }
+    public required IWslBackend Wsl { get; init; }
+    public required ISystemInfoProvider SystemInfo { get; init; }
+    public required IProcessRunner ProcessRunner { get; init; }
+    public required ICommandLog CommandLog { get; init; }
+
+    /// <summary>Non-null when the current mode is safe; the UI drains its Pending channel.</summary>
+    public InteractiveGate? InteractiveGate { get; private set; }
+
+    public static SlopworksHost Create()
+    {
+        var paths = new SlopworksPaths(RootLocator.Resolve());
+        paths.EnsureCreated();
+
+        var config = ConfigStore.LoadOrCreate(paths);
+        var logger = new FileLoggerProvider(paths.LogsDir).CreateLogger("Slopworks");
+        var commandLog = new FileCommandLog(paths.LogsDir);
+        var runner = new SystemProcessRunner();
+        var probes = new RecordingProcessRunner(runner, commandLog, "probe", "read-only");
+
+        return new SlopworksHost
+        {
+            Paths = paths,
+            Config = config,
+            Logger = logger,
+            Journal = FileStateJournal.Load(paths.JournalFile),
+            Wsl = new WindowsWslBackend(probes),
+            SystemInfo = new WindowsSystemInfo(paths, probes),
+            ProcessRunner = runner,
+            CommandLog = commandLog,
+        };
+    }
+
+    public async Task<(ConvergenceEngine Engine, SystemProfile Profile)> CreateEngineAsync(CancellationToken ct)
+    {
+        var profile = await SystemInfo.GetProfileAsync(ct);
+
+        var context = new StepContext
+        {
+            Paths = Paths,
+            Config = Config,
+            Profile = profile,
+            Logger = Logger,
+            Journal = Journal,
+            Probes = new RecordingProcessRunner(ProcessRunner, CommandLog, "probe", "read-only"),
+        };
+
+        var engine = new ConvergenceEngine(StepCatalog.CreateWindowsSteps(Wsl), new EngineServices
+        {
+            StepContext = context,
+            Gate = BuildGate(),
+            ProcessRunner = ProcessRunner,
+            CommandLog = CommandLog,
+            Logger = Logger,
+        });
+
+        return (engine, profile);
+    }
+
+    private IActionGate BuildGate()
+    {
+        if (Config.IsAutoMode)
+        {
+            InteractiveGate = null;
+            return new AutoApproveGate(Logger);
+        }
+
+        InteractiveGate = new InteractiveGate();
+        return new PolicyGate(InteractiveGate, Config.AutoApproveInsideRoot);
+    }
+}
