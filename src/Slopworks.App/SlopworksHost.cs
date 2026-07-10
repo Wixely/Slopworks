@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging;
 using Slopworks.Core.Actions;
+using Slopworks.Core.Artifacts;
 using Slopworks.Core.Config;
 using Slopworks.Core.Engine;
+using Slopworks.Core.Http;
 using Slopworks.Core.Logging;
 using Slopworks.Core.Platform;
 using Slopworks.Core.State;
@@ -26,6 +28,8 @@ public sealed class SlopworksHost
     public required ISystemInfoProvider SystemInfo { get; init; }
     public required IProcessRunner ProcessRunner { get; init; }
     public required ICommandLog CommandLog { get; init; }
+    public required IArtifactResolver Resolver { get; init; }
+    public required Downloader Downloader { get; init; }
 
     /// <summary>Non-null when the current mode is safe; the UI drains its Pending channel.</summary>
     public InteractiveGate? InteractiveGate { get; private set; }
@@ -40,17 +44,21 @@ public sealed class SlopworksHost
         var commandLog = new FileCommandLog(paths.LogsDir);
         var runner = new SystemProcessRunner();
         var probes = new RecordingProcessRunner(runner, commandLog, "probe", "read-only");
+        var journal = FileStateJournal.Load(paths.JournalFile);
+        var http = SlopworksHttpClient.Create(config.Network);
 
         return new SlopworksHost
         {
             Paths = paths,
             Config = config,
             Logger = logger,
-            Journal = FileStateJournal.Load(paths.JournalFile),
+            Journal = journal,
             Wsl = new WindowsWslBackend(probes),
             SystemInfo = new WindowsSystemInfo(paths, probes),
             ProcessRunner = runner,
             CommandLog = commandLog,
+            Resolver = new ArtifactResolver(config, journal, http, logger),
+            Downloader = new Downloader(http),
         };
     }
 
@@ -68,7 +76,7 @@ public sealed class SlopworksHost
             Probes = new RecordingProcessRunner(ProcessRunner, CommandLog, "probe", "read-only"),
         };
 
-        var engine = new ConvergenceEngine(StepCatalog.CreateWindowsSteps(Wsl), new EngineServices
+        var engine = new ConvergenceEngine(StepCatalog.CreateWindowsSteps(Wsl, Resolver, Downloader), new EngineServices
         {
             StepContext = context,
             Gate = BuildGate(),

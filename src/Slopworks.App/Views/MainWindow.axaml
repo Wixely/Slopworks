@@ -5,7 +5,14 @@
         x:Class="Slopworks.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="Slopworks"
-        Width="960" Height="680"
+        Width="1080" Height="720"
         WindowStartupLocation="CenterScreen">
-  <views:DashboardView DataContext="{Binding Dashboard}" />
+  <TabControl Margin="4">
+    <TabItem Header="Dashboard">
+      <views:DashboardView DataContext="{Binding Dashboard}" />
+    </TabItem>
+    <TabItem Header="Setup">
+      <views:SetupWizardView DataContext="{Binding Wizard}" />
+    </TabItem>
+  </TabControl>
 </Window>

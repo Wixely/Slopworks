@@ -1,3 +1,4 @@
+using Slopworks.Core.Artifacts;
 using Slopworks.Core.Engine;
 using Slopworks.Core.Platform;
 
@@ -9,12 +10,14 @@ namespace Slopworks.Core.Steps;
 /// </summary>
 public static class StepCatalog
 {
-    public static IReadOnlyList<ISetupStep> CreateWindowsSteps(IWslBackend wsl) =>
+    public static IReadOnlyList<ISetupStep> CreateWindowsSteps(
+        IWslBackend wsl, IArtifactResolver resolver, Downloader downloader) =>
     [
         new PreflightStep(),
         new WslFeatureStep(wsl),
         new WslKernelStep(wsl),
-        // Phase 3+: rootfs.download, wsl.import, distro.base, distro.podman,
-        // distro.nvidia, image.pull, gpu.smoke, vllm.smoke
+        new RootfsDownloadStep(resolver, downloader),
+        // Phase 4+: wsl.import, distro.base, distro.podman, distro.nvidia,
+        // image.pull, gpu.smoke, vllm.smoke
     ];
 }
