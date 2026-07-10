@@ -1,0 +1,91 @@
+using System.Diagnostics;
+using System.Text;
+using Slopworks.Platform.Abstractions;
+
+namespace Slopworks.Platform.Windows;
+
+/// <summary>
+/// Runs external processes with redirected, line-streamed output. Callers set
+/// ProcessSpec.StdoutEncoding to UTF-16LE for wsl.exe management commands and UTF-8 for
+/// commands executed inside a distro. Cancellation kills the whole process tree.
+/// Elevated execution is handled by the separate elevated-worker relaunch mechanism, not here.
+/// </summary>
+public sealed class SystemProcessRunner : IProcessRunner
+{
+    public async Task<ProcessResult> RunAsync(ProcessSpec spec, IProgress<string>? liveOutput, CancellationToken ct)
+    {
+        if (spec.RequiresElevation)
+            throw new NotSupportedException(
+                "Elevated processes must go through the elevated-worker relaunch, not SystemProcessRunner.");
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = spec.Exe,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            WorkingDirectory = spec.WorkingDir ?? "",
+            StandardOutputEncoding = spec.StdoutEncoding ?? Encoding.UTF8,
+            StandardErrorEncoding = spec.StdoutEncoding ?? Encoding.UTF8,
+        };
+
+        foreach (var arg in spec.Args)
+            psi.ArgumentList.Add(arg);
+
+        if (spec.Env is not null)
+        {
+            foreach (var (key, value) in spec.Env)
+                psi.Environment[key] = value;
+        }
+
+        var stdout = new StringBuilder();
+        var stderr = new StringBuilder();
+
+        using var process = new Process { StartInfo = psi };
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (e.Data is null)
+                return;
+            lock (stdout)
+                stdout.AppendLine(e.Data);
+            liveOutput?.Report(e.Data);
+        };
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (e.Data is null)
+                return;
+            lock (stderr)
+                stderr.AppendLine(e.Data);
+            liveOutput?.Report(e.Data);
+        };
+
+        var stopwatch = Stopwatch.StartNew();
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+
+        await using var killOnCancel = ct.Register(() =>
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+                // Already exited.
+            }
+        });
+
+        await process.WaitForExitAsync(ct);
+        stopwatch.Stop();
+
+        lock (stdout)
+        {
+            lock (stderr)
+            {
+                return new ProcessResult(process.ExitCode, stdout.ToString(), stderr.ToString(), stopwatch.Elapsed);
+            }
+        }
+    }
+}

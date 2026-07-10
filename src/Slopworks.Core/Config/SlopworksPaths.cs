@@ -1,0 +1,38 @@
+namespace Slopworks.Core.Config;
+
+/// <summary>
+/// Every path Slopworks touches, derived from the single root directory. Nothing outside
+/// this root is written except the pointer file in %APPDATA%/Slopworks (see rootpath docs)
+/// and system-level WSL registration.
+/// </summary>
+public sealed class SlopworksPaths(string root)
+{
+    public const string DistroName = "slopworks";
+
+    public string Root { get; } = Path.GetFullPath(root);
+
+    public string ConfigFile => Path.Combine(Root, "config.json");
+    public string StateDir => Path.Combine(Root, "state");
+    public string JournalFile => Path.Combine(StateDir, "journal.json");
+    public string SmokeDir => Path.Combine(StateDir, "smoke");
+    public string ElevatedDir => Path.Combine(StateDir, "elevated");
+    public string DownloadsDir => Path.Combine(Root, "downloads");
+    public string RootfsDir => Path.Combine(DownloadsDir, "rootfs");
+    public string WslDir => Path.Combine(Root, "wsl");
+    public string DistroDir => Path.Combine(WslDir, DistroName);
+    public string LogsDir => Path.Combine(Root, "logs");
+    public string VllmLogsDir => Path.Combine(LogsDir, "vllm");
+
+    public void EnsureCreated()
+    {
+        foreach (var dir in new[] { Root, StateDir, SmokeDir, ElevatedDir, RootfsDir, WslDir, LogsDir, VllmLogsDir })
+            Directory.CreateDirectory(dir);
+    }
+
+    public bool Contains(string path)
+    {
+        var full = Path.GetFullPath(path);
+        return full.StartsWith(Root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(full, Root, StringComparison.OrdinalIgnoreCase);
+    }
+}
