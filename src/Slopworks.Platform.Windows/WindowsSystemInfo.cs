@@ -15,14 +15,34 @@ public sealed class WindowsSystemInfo(SlopworksPaths paths, IProcessRunner probe
 {
     public async Task<SystemProfile> GetProfileAsync(CancellationToken ct)
     {
+        var gpu = await DetectGpuAsync(ct);
         return new SystemProfile
         {
             OsDescription = RuntimeInformation.OSDescription,
             OsBuild = Environment.OSVersion.Version.Build,
-            Gpu = await DetectGpuAsync(ct),
+            Gpu = gpu,
+            NvidiaHardwarePresent = gpu is not null || await DetectNvidiaHardwareAsync(ct),
             FreeDiskBytes = GetFreeDiskBytes(),
             TotalMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes,
         };
+    }
+
+    /// <summary>
+    /// Driver-independent hardware check: pnputil enumerates PCI display devices with their
+    /// vendor ids even when Windows only has a basic display driver for them.
+    /// </summary>
+    private async Task<bool> DetectNvidiaHardwareAsync(CancellationToken ct)
+    {
+        try
+        {
+            var result = await probes.RunAsync(
+                new ProcessSpec("pnputil.exe", ["/enum-devices", "/class", "Display"]), null, ct);
+            return result.Succeeded && NvidiaHardwareDetector.ContainsNvidiaDevice(result.Stdout);
+        }
+        catch (Win32Exception)
+        {
+            return false;
+        }
     }
 
     private async Task<GpuInfo?> DetectGpuAsync(CancellationToken ct)
@@ -57,6 +77,13 @@ public sealed class WindowsSystemInfo(SlopworksPaths paths, IProcessRunner probe
             return 0;
         }
     }
+}
+
+public static class NvidiaHardwareDetector
+{
+    /// <summary>PCI vendor id 10DE = NVIDIA; present in pnputil instance ids regardless of driver state.</summary>
+    public static bool ContainsNvidiaDevice(string pnputilOutput)
+        => pnputilOutput.Contains("VEN_10DE", StringComparison.OrdinalIgnoreCase);
 }
 
 public static class NvidiaSmiParser

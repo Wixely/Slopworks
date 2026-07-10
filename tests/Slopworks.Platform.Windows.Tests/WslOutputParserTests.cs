@@ -98,6 +98,34 @@ public class WslOutputParserTests
     }
 }
 
+public class NvidiaHardwareDetectorTests
+{
+    [Fact]
+    public void DetectsNvidiaVendorId_EvenWithBasicDisplayDriver()
+    {
+        const string pnputilOutput = """
+            Instance ID:                PCI\VEN_10DE&DEV_2684&SUBSYS_167C10DE&REV_A1\4&2283f625&0&0019
+            Device Description:         Microsoft Basic Display Adapter
+            Class Name:                 Display
+            Status:                     Started
+            """;
+
+        Assert.True(NvidiaHardwareDetector.ContainsNvidiaDevice(pnputilOutput));
+    }
+
+    [Fact]
+    public void IntelOnlyMachine_IsNotDetectedAsNvidia()
+    {
+        const string pnputilOutput = """
+            Instance ID:                PCI\VEN_8086&DEV_9BC8&SUBSYS_86941043&REV_03\3&11583659&0&10
+            Device Description:         Intel(R) UHD Graphics 630
+            Class Name:                 Display
+            """;
+
+        Assert.False(NvidiaHardwareDetector.ContainsNvidiaDevice(pnputilOutput));
+    }
+}
+
 public class NvidiaSmiParserTests
 {
     [Fact]

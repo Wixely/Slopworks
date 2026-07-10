@@ -14,6 +14,12 @@ public sealed record SystemProfile
     public long FreeDiskBytes { get; init; }
     public long TotalMemoryBytes { get; init; }
 
+    /// <summary>
+    /// True when an NVIDIA PCI device is present even if no driver is installed (nvidia-smi
+    /// absent). Lets setup distinguish "no NVIDIA card" from "card without driver".
+    /// </summary>
+    public bool NvidiaHardwarePresent { get; init; }
+
     /// <summary>Null when not yet probed; false when virtualization is definitively unavailable.</summary>
     public bool? VirtualizationEnabled { get; init; }
 

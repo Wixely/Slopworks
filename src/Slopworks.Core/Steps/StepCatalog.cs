@@ -16,6 +16,7 @@ public static class StepCatalog
         ILinuxCommandFactory linux, VllmServerController server) =>
     [
         new PreflightStep(),
+        new NvidiaDriverStep(),
         new WslFeatureStep(wsl),
         new WslKernelStep(wsl),
         new RootfsDownloadStep(resolver, downloader),
