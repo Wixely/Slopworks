@@ -6,6 +6,7 @@ using Slopworks.Core.Engine;
 using Slopworks.Core.Http;
 using Slopworks.Core.Logging;
 using Slopworks.Core.Platform;
+using Slopworks.Core.Server;
 using Slopworks.Core.State;
 using Slopworks.Core.Steps;
 using Slopworks.Platform.Abstractions;
@@ -32,6 +33,8 @@ public sealed class SlopworksHost
     public required IArtifactResolver Resolver { get; init; }
     public required Downloader Downloader { get; init; }
     public required IShellIntegration ShellIntegration { get; init; }
+    public required ILinuxCommandFactory Linux { get; init; }
+    public required VllmServerController Server { get; init; }
 
     /// <summary>Non-null when the current mode is safe; the UI drains its Pending channel.</summary>
     public InteractiveGate? InteractiveGate { get; private set; }
@@ -49,6 +52,7 @@ public sealed class SlopworksHost
         var probes = new RecordingProcessRunner(runner, commandLog, "probe", "read-only");
         var journal = FileStateJournal.Load(paths.JournalFile);
         var http = SlopworksHttpClient.Create(config.Network);
+        var linux = new WslLinuxCommandFactory(SlopworksPaths.DistroName);
 
         return new SlopworksHost
         {
@@ -63,6 +67,8 @@ public sealed class SlopworksHost
             Resolver = new ArtifactResolver(config, journal, http, logger),
             Downloader = new Downloader(http),
             ShellIntegration = new WindowsShellIntegration(runner),
+            Linux = linux,
+            Server = new VllmServerController(linux, config, http),
         };
     }
 
@@ -80,7 +86,8 @@ public sealed class SlopworksHost
             Probes = new RecordingProcessRunner(ProcessRunner, CommandLog, "probe", "read-only"),
         };
 
-        var engine = new ConvergenceEngine(StepCatalog.CreateWindowsSteps(Wsl, Resolver, Downloader), new EngineServices
+        var engine = new ConvergenceEngine(
+            StepCatalog.CreateWindowsSteps(Wsl, Resolver, Downloader, Linux, Server), new EngineServices
         {
             StepContext = context,
             Gate = BuildGate(),
