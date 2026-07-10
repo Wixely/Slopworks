@@ -35,6 +35,13 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
         if (config.Server.HfToken is { Length: > 0 })
             args.Add("-e HUGGING_FACE_HUB_TOKEN=\"$HF_TOKEN\""); // injected via env, kept out of the visible command
 
+        if (config.Network.Proxy is { Length: > 0 } proxy)
+        {
+            // Model downloads happen inside the container; give it the same proxy.
+            args.Add($"-e HTTP_PROXY={proxy} -e HTTPS_PROXY={proxy} -e http_proxy={proxy} -e https_proxy={proxy}");
+            args.Add("-e NO_PROXY=localhost,127.0.0.1");
+        }
+
         if (profile.GpuPresent)
             args.AddRange(["--device nvidia.com/gpu=all", "--ipc=host"]);
         else

@@ -67,14 +67,50 @@ public sealed class DistroImportStep(IWslBackend wsl) : ISetupStep
                 }));
         }
 
-        actions.Add(new PlannedAction(
-            ActionId: "wsl.import.import",
-            StepId: Id,
-            Kind: ActionKind.Execute,
-            Description: $"Import the rootfs as WSL distro '{SlopworksPaths.DistroName}' (disk stays inside the Slopworks folder)",
-            Detail: $"wsl.exe --import {SlopworksPaths.DistroName} \"{ctx.Paths.DistroDir}\" \"<rootfs tarball>\" --version 2",
-            InsideSlopworksRoot: false,
-            Execute: (exec, token) => ImportAsync(ctx, exec, token)));
+        if (ctx.Config.Distro.UsesTarball)
+        {
+            actions.Add(new PlannedAction(
+                ActionId: "wsl.import.import",
+                StepId: Id,
+                Kind: ActionKind.Execute,
+                Description: $"Import the rootfs as WSL distro '{SlopworksPaths.DistroName}' (disk stays inside the Slopworks folder)",
+                Detail: $"wsl.exe --import {SlopworksPaths.DistroName} \"{ctx.Paths.DistroDir}\" \"<rootfs tarball>\" --version 2",
+                InsideSlopworksRoot: false,
+                Execute: (exec, token) => ImportAsync(ctx, exec, token)));
+        }
+        else
+        {
+            // WSL's own catalog: no guessed URLs — WSL resolves, downloads, and verifies the
+            // distro itself (same delivery channel as wsl --update), straight into our folder.
+            var name = ctx.Config.Distro.OnlineName;
+            IReadOnlyList<string> args =
+                ["--install", "--distribution", name, "--name", SlopworksPaths.DistroName,
+                 "--location", ctx.Paths.DistroDir, "--no-launch", "--web-download"];
+
+            actions.Add(new PlannedAction(
+                ActionId: "wsl.import.install-online",
+                StepId: Id,
+                Kind: ActionKind.Download,
+                Description: $"Install '{name}' from the official WSL distro catalog as '{SlopworksPaths.DistroName}' " +
+                             "(disk stays inside the Slopworks folder)",
+                Detail: $"wsl.exe {string.Join(' ', args)}",
+                InsideSlopworksRoot: false,
+                Execute: async (exec, token) =>
+                {
+                    Directory.CreateDirectory(exec.Paths.DistroDir);
+                    var result = await exec.Processes.RunAsync(WslCommands.Management(args), exec.Output, token);
+                    if (result.Succeeded)
+                        return ActionResult.Success($"'{name}' installed from the WSL catalog as '{SlopworksPaths.DistroName}'.");
+
+                    var hint = result.Stdout.Contains("Invalid command line", StringComparison.OrdinalIgnoreCase)
+                            || result.Stderr.Contains("Invalid command line", StringComparison.OrdinalIgnoreCase)
+                        ? " This WSL build may not support --name/--location — run wsl --update, or set distro.source " +
+                          "to 'tarball' in config.json."
+                        : $" Check the name against 'wsl --list --online' (configured: {name}).";
+                    return ActionResult.Failure(
+                        $"wsl --install failed (exit {result.ExitCode}): {TextUtil.Condense(result.Stderr + result.Stdout)}{hint}");
+                }));
+        }
 
         return Task.FromResult<IReadOnlyList<PlannedAction>>(actions);
     }

@@ -21,6 +21,13 @@ public sealed class RootfsDownloadStep(IArtifactResolver resolver, Downloader do
 
     public Task<StepDetection> DetectAsync(StepContext ctx, CancellationToken ct)
     {
+        if (!ctx.Config.Distro.UsesTarball)
+        {
+            return Task.FromResult(StepDetection.Ok(
+                $"Not needed — the distro comes straight from the official WSL catalog ({ctx.Config.Distro.OnlineName}). " +
+                "Set distro.source to 'tarball' in config.json to use a custom rootfs URL instead."));
+        }
+
         if (!ctx.Config.Artifacts.TryGetValue(ArtifactKey, out var source))
             return Task.FromResult(StepDetection.Broken("config.json has no 'rootfs' artifact source."));
 

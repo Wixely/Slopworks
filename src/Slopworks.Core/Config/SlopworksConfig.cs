@@ -19,6 +19,7 @@ public sealed class SlopworksConfig
 
     public ServerConfig Server { get; set; } = new();
     public ImagesConfig Images { get; set; } = new();
+    public DistroConfig Distro { get; set; } = new();
 
     /// <summary>Per-artifact download sources; every URL overridable, GitHub sources auto-resolved to latest.</summary>
     public Dictionary<string, ArtifactSource> Artifacts { get; set; } = DefaultArtifacts();
@@ -52,6 +53,24 @@ public sealed class ImagesConfig
     // Podman needs fully-qualified image names — it does not default to Docker Hub.
     public string Gpu { get; set; } = "docker.io/vllm/vllm-openai:latest";
     public string Cpu { get; set; } = "public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:latest";
+}
+
+public sealed class DistroConfig
+{
+    public const string SourceWslOnline = "wsl-online";
+    public const string SourceTarball = "tarball";
+
+    /// <summary>
+    /// "wsl-online" (default): WSL downloads the distro itself from Microsoft's official
+    /// catalog (wsl --list --online) — no guessed URLs, checksums handled by WSL.
+    /// "tarball": download the rootfs from the configured artifacts.rootfs source instead.
+    /// </summary>
+    public string Source { get; set; } = SourceWslOnline;
+
+    /// <summary>Catalog name as shown by wsl --list --online.</summary>
+    public string OnlineName { get; set; } = "Ubuntu-24.04";
+
+    public bool UsesTarball => string.Equals(Source, SourceTarball, StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed class ArtifactSource
