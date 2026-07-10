@@ -1,13 +1,27 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Slopworks.Core.Engine;
 
 namespace Slopworks.App.ViewModels;
 
-public partial class StepStatusItemViewModel(string id, string title) : ObservableObject
+public partial class StepStatusItemViewModel(string id, string title, Action<string>? onBypass = null) : ObservableObject
 {
     public string Id { get; } = id;
     public string Title { get; } = title;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanBypass))]
+    private string? _bypassKey;
+
+    public bool CanBypass => BypassKey is not null && onBypass is not null;
+
+    [RelayCommand]
+    private void Bypass()
+    {
+        if (BypassKey is { } key)
+            onBypass?.Invoke(key);
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StateBrush))]
@@ -35,6 +49,7 @@ public partial class StepStatusItemViewModel(string id, string title) : Observab
         State = detection.State.ToString();
         Summary = detection.Summary;
         Evidence = string.Join(Environment.NewLine, detection.Evidence);
+        BypassKey = detection.BypassKey;
     }
 
     public void MarkOutcome(StepOutcome outcome, string? detail)

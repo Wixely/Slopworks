@@ -48,6 +48,11 @@
                     <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
                   </DockPanel>
                   <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" FontSize="12" Opacity="0.75" />
+                  <Button Content="Bypass this check"
+                          Command="{Binding BypassCommand}"
+                          IsVisible="{Binding CanBypass}"
+                          FontSize="12"
+                          ToolTip.Tip="This is advice, not a requirement — bypass it if you know your model fits." />
                 </StackPanel>
               </Border>
             </DataTemplate>

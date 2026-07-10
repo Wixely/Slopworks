@@ -10,6 +10,13 @@ public sealed class SlopworksConfig
     /// <summary>In safe mode, skip prompts for file writes/deletes confined to the Slopworks root.</summary>
     public bool AutoApproveInsideRoot { get; set; } = true;
 
+    /// <summary>
+    /// Bypassed opinionated checks (e.g. "preflight.disk"). Slopworks doesn't know what model
+    /// you'll run — resource-headroom checks are advice, not requirements. Technical blockers
+    /// (OS too old, virtualization off) are never bypassable.
+    /// </summary>
+    public List<string> Bypasses { get; set; } = [];
+
     public ServerConfig Server { get; set; } = new();
     public ImagesConfig Images { get; set; } = new();
 

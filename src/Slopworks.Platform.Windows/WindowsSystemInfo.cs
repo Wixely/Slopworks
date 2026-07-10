@@ -21,6 +21,7 @@ public sealed class WindowsSystemInfo(SlopworksPaths paths, IProcessRunner probe
             OsBuild = Environment.OSVersion.Version.Build,
             Gpu = await DetectGpuAsync(ct),
             FreeDiskBytes = GetFreeDiskBytes(),
+            TotalMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes,
         };
     }
 

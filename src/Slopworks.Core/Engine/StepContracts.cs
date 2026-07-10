@@ -13,6 +13,13 @@ public enum StepState
 
 public sealed record StepDetection(StepState State, string Summary, IReadOnlyList<string> Evidence)
 {
+    /// <summary>
+    /// Set when this failure is an opinionated check (resource headroom etc.) rather than a
+    /// technical requirement. The UI offers a one-click bypass that records the key in
+    /// config.json "bypasses"; bypassed checks downgrade to warnings on the next detect.
+    /// </summary>
+    public string? BypassKey { get; init; }
+
     public static StepDetection Ok(string summary, params string[] evidence) => new(StepState.Ok, summary, evidence);
     public static StepDetection Missing(string summary, params string[] evidence) => new(StepState.Missing, summary, evidence);
     public static StepDetection Partial(string summary, params string[] evidence) => new(StepState.Partial, summary, evidence);

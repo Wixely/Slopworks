@@ -38,7 +38,7 @@ public partial class DashboardViewModel(SlopworksHost host) : ObservableObject
             var items = new Dictionary<string, StepStatusItemViewModel>();
             foreach (var step in engine.Steps.Where(s => s.AppliesTo(profile)))
             {
-                var item = new StepStatusItemViewModel(step.Id, step.Title);
+                var item = new StepStatusItemViewModel(step.Id, step.Title, BypassCheck);
                 items[step.Id] = item;
                 Steps.Add(item);
             }
@@ -69,5 +69,17 @@ public partial class DashboardViewModel(SlopworksHost host) : ObservableObject
         {
             IsRefreshing = false;
         }
+    }
+
+    /// <summary>Records the bypass in config and re-detects; the check downgrades to a warning.</summary>
+    private void BypassCheck(string bypassKey)
+    {
+        if (!host.Config.Bypasses.Contains(bypassKey))
+        {
+            host.Config.Bypasses.Add(bypassKey);
+            Slopworks.Core.Config.ConfigStore.Save(host.Paths, host.Config);
+        }
+
+        RefreshCommand.Execute(null);
     }
 }

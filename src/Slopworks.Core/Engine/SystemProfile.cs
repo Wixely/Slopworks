@@ -12,6 +12,7 @@ public sealed record SystemProfile
     public int OsBuild { get; init; }
     public GpuInfo? Gpu { get; init; }
     public long FreeDiskBytes { get; init; }
+    public long TotalMemoryBytes { get; init; }
 
     /// <summary>Null when not yet probed; false when virtualization is definitively unavailable.</summary>
     public bool? VirtualizationEnabled { get; init; }

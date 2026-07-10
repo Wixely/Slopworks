@@ -58,7 +58,7 @@ public partial class SetupWizardViewModel(SlopworksHost host) : ObservableObject
             var items = new Dictionary<string, StepStatusItemViewModel>();
             foreach (var step in engine.Steps.Where(s => s.AppliesTo(profile)))
             {
-                var item = new StepStatusItemViewModel(step.Id, step.Title);
+                var item = new StepStatusItemViewModel(step.Id, step.Title, BypassCheck);
                 items[step.Id] = item;
                 Steps.Add(item);
             }
@@ -179,5 +179,16 @@ public partial class SetupWizardViewModel(SlopworksHost host) : ObservableObject
         Output.Add(line);
         while (Output.Count > OutputCap)
             Output.RemoveAt(0);
+    }
+
+    private void BypassCheck(string bypassKey)
+    {
+        if (!host.Config.Bypasses.Contains(bypassKey))
+        {
+            host.Config.Bypasses.Add(bypassKey);
+            ConfigStore.Save(host.Paths, host.Config);
+        }
+
+        StatusText = $"Check '{bypassKey}' bypassed — run setup again to continue past it.";
     }
 }
