@@ -1,0 +1,51 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore Slopworks.slnx
+
+      - name: Build
+        run: dotnet build Slopworks.slnx --no-restore -c Release
+
+      - name: Test
+        run: dotnet test Slopworks.slnx --no-build -c Release --logger "trx;LogFileName=results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'
+
+      - name: Publish single-file app (win-x64)
+        run: >
+          dotnet publish src/Slopworks.App/Slopworks.App.csproj
+          -c Release -r win-x64 --self-contained
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:ContinuousIntegrationBuild=true
+          -o publish
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Slopworks-win-x64
+          path: publish/
