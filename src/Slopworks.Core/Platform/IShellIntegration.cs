@@ -11,5 +11,7 @@ public interface IShellIntegration
 
     void RemoveResumeOnStartup();
 
+    bool ResumeOnStartupInstalled { get; }
+
     Task RequestRebootAsync(CancellationToken ct);
 }
