@@ -19,9 +19,33 @@ public class NvidiaDriverStepTests
     };
 
     [Fact]
-    public void NoNvidiaHardware_StepDoesNotApply()
+    public void StepAlwaysApplies_DetectionIsNotTrustedToHideIt()
     {
-        Assert.False(new NvidiaDriverStep().AppliesTo(new SystemProfile()));
+        if (OperatingSystem.IsWindows())
+            Assert.True(new NvidiaDriverStep().AppliesTo(new SystemProfile()));
+    }
+
+    [Fact]
+    public async Task NoHardwareDetected_IsOkButForceable()
+    {
+        var detection = await new NvidiaDriverStep().DetectAsync(Context(new SystemProfile()), CancellationToken.None);
+
+        Assert.Equal(StepState.Ok, detection.State);
+        Assert.Equal(NvidiaDriverStep.BypassKeyName, detection.ForceKey);
+        Assert.Contains("Check anyway", detection.Summary);
+    }
+
+    [Fact]
+    public async Task NoHardwareDetected_Forced_RunsDriverFlowAnyway()
+    {
+        var config = new SlopworksConfig { Forces = [NvidiaDriverStep.BypassKeyName] };
+
+        var detection = await new NvidiaDriverStep().DetectAsync(
+            Context(new SystemProfile(), config), CancellationToken.None);
+
+        Assert.Equal(StepState.Broken, detection.State);
+        Assert.Equal(NvidiaDriverStep.BypassKeyName, detection.BypassKey);
+        Assert.Contains("overridden by you", detection.Summary);
     }
 
     [Fact]

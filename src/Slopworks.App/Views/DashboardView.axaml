@@ -43,6 +43,11 @@
                           IsVisible="{Binding CanBypass}"
                           FontSize="12"
                           ToolTip.Tip="This is advice, not a requirement — bypass it if you know your model fits. Recorded in config.json under 'bypasses'." />
+                  <Button Content="Check anyway"
+                          Command="{Binding ForceCommand}"
+                          IsVisible="{Binding CanForce}"
+                          FontSize="12"
+                          ToolTip.Tip="Detection is a heuristic — if you know it's wrong, run this check as if the condition is present. Recorded in config.json under 'forces'." />
                   <Expander Header="Evidence"
                             IsVisible="{Binding Evidence, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     <TextBlock Text="{Binding Evidence}"

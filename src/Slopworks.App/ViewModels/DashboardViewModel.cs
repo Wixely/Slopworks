@@ -38,7 +38,7 @@ public partial class DashboardViewModel(SlopworksHost host) : ObservableObject
             var items = new Dictionary<string, StepStatusItemViewModel>();
             foreach (var step in engine.Steps.Where(s => s.AppliesTo(profile)))
             {
-                var item = new StepStatusItemViewModel(step.Id, step.Title, BypassCheck);
+                var item = new StepStatusItemViewModel(step.Id, step.Title, BypassCheck, ForceCheck);
                 items[step.Id] = item;
                 Steps.Add(item);
             }
@@ -77,6 +77,18 @@ public partial class DashboardViewModel(SlopworksHost host) : ObservableObject
         if (!host.Config.Bypasses.Contains(bypassKey))
         {
             host.Config.Bypasses.Add(bypassKey);
+            Slopworks.Core.Config.ConfigStore.Save(host.Paths, host.Config);
+        }
+
+        RefreshCommand.Execute(null);
+    }
+
+    /// <summary>User overrides a passing heuristic ("no NVIDIA card found") they know is wrong.</summary>
+    private void ForceCheck(string forceKey)
+    {
+        if (!host.Config.Forces.Contains(forceKey))
+        {
+            host.Config.Forces.Add(forceKey);
             Slopworks.Core.Config.ConfigStore.Save(host.Paths, host.Config);
         }
 

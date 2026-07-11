@@ -20,6 +20,14 @@ public sealed record StepDetection(StepState State, string Summary, IReadOnlyLis
     /// </summary>
     public string? BypassKey { get; init; }
 
+    /// <summary>
+    /// The mirror of BypassKey: set when this PASSING detection rests on a heuristic the user
+    /// may know to be wrong (e.g. "no NVIDIA hardware found"). The UI offers a one-click
+    /// override recorded in config.json "forces"; forced checks treat the condition as present
+    /// on the next detect.
+    /// </summary>
+    public string? ForceKey { get; init; }
+
     public static StepDetection Ok(string summary, params string[] evidence) => new(StepState.Ok, summary, evidence);
     public static StepDetection Missing(string summary, params string[] evidence) => new(StepState.Missing, summary, evidence);
     public static StepDetection Partial(string summary, params string[] evidence) => new(StepState.Partial, summary, evidence);

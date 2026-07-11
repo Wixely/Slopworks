@@ -5,7 +5,8 @@ using Slopworks.Core.Engine;
 
 namespace Slopworks.App.ViewModels;
 
-public partial class StepStatusItemViewModel(string id, string title, Action<string>? onBypass = null) : ObservableObject
+public partial class StepStatusItemViewModel(
+    string id, string title, Action<string>? onBypass = null, Action<string>? onForce = null) : ObservableObject
 {
     public string Id { get; } = id;
     public string Title { get; } = title;
@@ -14,13 +15,26 @@ public partial class StepStatusItemViewModel(string id, string title, Action<str
     [NotifyPropertyChangedFor(nameof(CanBypass))]
     private string? _bypassKey;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanForce))]
+    private string? _forceKey;
+
     public bool CanBypass => BypassKey is not null && onBypass is not null;
+
+    public bool CanForce => ForceKey is not null && onForce is not null;
 
     [RelayCommand]
     private void Bypass()
     {
         if (BypassKey is { } key)
             onBypass?.Invoke(key);
+    }
+
+    [RelayCommand]
+    private void Force()
+    {
+        if (ForceKey is { } key)
+            onForce?.Invoke(key);
     }
 
     [ObservableProperty]
@@ -50,6 +64,7 @@ public partial class StepStatusItemViewModel(string id, string title, Action<str
         Summary = detection.Summary;
         Evidence = string.Join(Environment.NewLine, detection.Evidence);
         BypassKey = detection.BypassKey;
+        ForceKey = detection.ForceKey;
     }
 
     public void MarkOutcome(StepOutcome outcome, string? detail)

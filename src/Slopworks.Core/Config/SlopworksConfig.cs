@@ -17,6 +17,12 @@ public sealed class SlopworksConfig
     /// </summary>
     public List<string> Bypasses { get; set; } = [];
 
+    /// <summary>
+    /// Forced checks (e.g. "gpu.driver"): the user overriding a passing heuristic they know
+    /// is wrong — "you say I have no NVIDIA card, but I do". The mirror of Bypasses.
+    /// </summary>
+    public List<string> Forces { get; set; } = [];
+
     public ServerConfig Server { get; set; } = new();
     public ImagesConfig Images { get; set; } = new();
     public DistroConfig Distro { get; set; } = new();

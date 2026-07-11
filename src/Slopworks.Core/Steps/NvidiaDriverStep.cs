@@ -26,13 +26,32 @@ public sealed class NvidiaDriverStep : ISetupStep
     public string Title => "NVIDIA driver";
     public IReadOnlyList<string> DependsOn => ["preflight"];
 
-    /// <summary>Skipped entirely when there is no NVIDIA hardware at all.</summary>
-    public bool AppliesTo(SystemProfile profile) => OperatingSystem.IsWindows() && profile.NvidiaHardwarePresent;
+    /// <summary>
+    /// Always shown on Windows — hardware detection is a heuristic, and hiding the step
+    /// would leave no way to correct it when it's wrong.
+    /// </summary>
+    public bool AppliesTo(SystemProfile profile) => OperatingSystem.IsWindows();
 
     public Task<StepDetection> DetectAsync(StepContext ctx, CancellationToken ct)
     {
         var profile = ctx.Profile;
         var bypassed = ctx.Config.Bypasses.Contains(BypassKeyName);
+        var forced = ctx.Config.Forces.Contains(BypassKeyName);
+
+        if (!profile.NvidiaHardwarePresent && !forced)
+        {
+            // Our heuristic says no card — but let the user overrule it rather than trusting
+            // ourselves blindly (disabled devices, odd enumeration, eGPUs...).
+            return Task.FromResult(StepDetection.Ok(
+                "No NVIDIA hardware detected (PCI scan) — running in CPU mode. " +
+                "If you DO have an NVIDIA card, use 'Check anyway' to run driver setup regardless.",
+                "pnputil found no display device with vendor id 10DE") with
+            { ForceKey = BypassKeyName });
+        }
+
+        var forcedNote = !profile.NvidiaHardwarePresent && forced
+            ? " (hardware check overridden by you — remove 'gpu.driver' from forces in config.json to reset)"
+            : "";
 
         if (profile.Gpu is { } gpu)
         {
@@ -66,8 +85,10 @@ public sealed class NvidiaDriverStep : ISetupStep
 
         return Task.FromResult(StepDetection.Broken(
             "An NVIDIA card is present but no driver is installed (nvidia-smi not found). " +
-            "Install the driver to use the GPU, or bypass to continue CPU-only.",
-            "pnputil found a PCI display device with vendor id 10DE (NVIDIA)") with
+            $"Install the driver to use the GPU, or bypass to continue CPU-only.{forcedNote}",
+            profile.NvidiaHardwarePresent
+                ? "pnputil found a PCI display device with vendor id 10DE (NVIDIA)"
+                : "no NVIDIA device found by pnputil; check forced by user") with
         { BypassKey = BypassKeyName });
     }
 

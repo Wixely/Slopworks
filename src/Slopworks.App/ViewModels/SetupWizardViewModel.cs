@@ -58,7 +58,7 @@ public partial class SetupWizardViewModel(SlopworksHost host) : ObservableObject
             var items = new Dictionary<string, StepStatusItemViewModel>();
             foreach (var step in engine.Steps.Where(s => s.AppliesTo(profile)))
             {
-                var item = new StepStatusItemViewModel(step.Id, step.Title, BypassCheck);
+                var item = new StepStatusItemViewModel(step.Id, step.Title, BypassCheck, ForceCheck);
                 items[step.Id] = item;
                 Steps.Add(item);
             }
@@ -190,5 +190,16 @@ public partial class SetupWizardViewModel(SlopworksHost host) : ObservableObject
         }
 
         StatusText = $"Check '{bypassKey}' bypassed — run setup again to continue past it.";
+    }
+
+    private void ForceCheck(string forceKey)
+    {
+        if (!host.Config.Forces.Contains(forceKey))
+        {
+            host.Config.Forces.Add(forceKey);
+            ConfigStore.Save(host.Paths, host.Config);
+        }
+
+        StatusText = $"Check '{forceKey}' will now run as if the condition is present — run setup again.";
     }
 }
