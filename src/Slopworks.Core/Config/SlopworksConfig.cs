@@ -48,6 +48,13 @@ public sealed class SlopworksConfig
 public sealed class ServerConfig
 {
     public int Port { get; set; } = 8000;
+
+    /// <summary>
+    /// When true, the vLLM port is reachable from other machines on the LAN (portproxy on
+    /// 0.0.0.0 + a firewall allow rule for this one port). Off by default; the API has no
+    /// authentication, so only enable on trusted networks.
+    /// </summary>
+    public bool ExposeToNetwork { get; set; }
     public string Model { get; set; } = "Qwen/Qwen2.5-0.5B-Instruct";
     public List<string> ExtraArgs { get; set; } = [];
     public string? HfToken { get; set; }

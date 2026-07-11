@@ -27,8 +27,69 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject
     [ObservableProperty]
     private bool _isBusy;
 
+    [ObservableProperty]
+    private bool _exposeToNetwork = host.Config.Server.ExposeToNetwork;
+
+    [ObservableProperty]
+    private string _networkStatus = "";
+
+    private bool _applyingExposure;
+
     private IProcessRunner Runner => new RecordingProcessRunner(
         host.ProcessRunner, host.CommandLog, "server-ui", "user-click");
+
+    /// <summary>The toggle click is the consent; the commands are still elevated (UAC) and audited.</summary>
+    partial void OnExposeToNetworkChanged(bool value)
+    {
+        if (_applyingExposure)
+            return;
+
+        _ = ApplyExposureAsync(value);
+    }
+
+    private async Task ApplyExposureAsync(bool enable)
+    {
+        var port = host.Config.Server.Port;
+        try
+        {
+            var result = enable
+                ? await host.NetworkExposure.EnableAsync(Runner, port, CancellationToken.None)
+                : await host.NetworkExposure.DisableAsync(Runner, port, CancellationToken.None);
+
+            if (!result.Succeeded && enable)
+            {
+                // Roll the toggle back without re-triggering the handler.
+                _applyingExposure = true;
+                ExposeToNetwork = false;
+                _applyingExposure = false;
+                NetworkStatus = $"Could not open port {port} to the network: " +
+                    Slopworks.Core.TextUtil.Condense(result.Stderr + result.Stdout, 200);
+                return;
+            }
+
+            host.Config.Server.ExposeToNetwork = enable;
+            ConfigStore.Save(host.Paths, host.Config);
+            UpdateNetworkStatus(enable, port);
+        }
+        catch (Exception ex)
+        {
+            NetworkStatus = $"Network exposure change failed: {ex.Message}";
+        }
+    }
+
+    private void UpdateNetworkStatus(bool enabled, int port)
+    {
+        if (!enabled)
+        {
+            NetworkStatus = "Server is reachable from this machine only (localhost).";
+            return;
+        }
+
+        var addresses = host.NetworkExposure.GetLanAddresses();
+        NetworkStatus = addresses.Count > 0
+            ? $"Reachable on your network: {string.Join("  ", addresses.Select(a => $"http://{a}:{port}/v1"))} — no authentication, trusted networks only."
+            : $"Port {port} is open to the network, but no LAN address was found to display.";
+    }
 
     [RelayCommand]
     private async Task StartAsync()
@@ -60,6 +121,14 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject
             StatusText = health.ApiHealthy
                 ? $"Container {health.ContainerState} · OpenAI-compatible API healthy at {host.Server.BaseUrl}/v1"
                 : $"Container {health.ContainerState} · API not responding at {host.Server.BaseUrl}";
+
+            // Reconcile the toggle with the actual portproxy state (read-only probe, no UAC).
+            var actuallyEnabled = await host.NetworkExposure.IsEnabledAsync(
+                Runner, host.Config.Server.Port, CancellationToken.None);
+            _applyingExposure = true;
+            ExposeToNetwork = actuallyEnabled;
+            _applyingExposure = false;
+            UpdateNetworkStatus(actuallyEnabled, host.Config.Server.Port);
         });
 
     [RelayCommand]

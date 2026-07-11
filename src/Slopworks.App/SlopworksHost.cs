@@ -35,6 +35,7 @@ public sealed class SlopworksHost
     public required IShellIntegration ShellIntegration { get; init; }
     public required ILinuxCommandFactory Linux { get; init; }
     public required VllmServerController Server { get; init; }
+    public required INetworkExposure NetworkExposure { get; init; }
 
     /// <summary>Non-null when the current mode is safe; the UI drains its Pending channel.</summary>
     public InteractiveGate? InteractiveGate { get; private set; }
@@ -69,6 +70,7 @@ public sealed class SlopworksHost
             ShellIntegration = new WindowsShellIntegration(runner),
             Linux = linux,
             Server = new VllmServerController(linux, config, http),
+            NetworkExposure = new WindowsNetworkExposure(),
         };
     }
 

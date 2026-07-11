@@ -17,13 +17,23 @@
       <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding HfToken}" PasswordChar="•" PlaceholderText="only needed for gated models" />
     </Grid>
 
-    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
-      <Button Content="Start" Command="{Binding StartCommand}" Classes="accent" IsEnabled="{Binding !IsBusy}" />
-      <Button Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding !IsBusy}" />
-      <Button Content="Refresh" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsBusy}" />
-      <Button Content="Tail logs" Command="{Binding TailLogsCommand}" IsEnabled="{Binding !IsBusy}" />
-      <Button Content="Fix port forwarding" Command="{Binding RepairForwardingCommand}" IsEnabled="{Binding !IsBusy}"
-              ToolTip.Tip="Restarts WSL — use when localhost stops responding after the machine slept" />
+    <StackPanel Grid.Row="2" Spacing="8" Margin="0,0,0,12">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Content="Start" Command="{Binding StartCommand}" Classes="accent" IsEnabled="{Binding !IsBusy}" />
+        <Button Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding !IsBusy}" />
+        <Button Content="Refresh" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsBusy}" />
+        <Button Content="Tail logs" Command="{Binding TailLogsCommand}" IsEnabled="{Binding !IsBusy}" />
+        <Button Content="Fix port forwarding" Command="{Binding RepairForwardingCommand}" IsEnabled="{Binding !IsBusy}"
+                ToolTip.Tip="Restarts WSL — use when localhost stops responding after the machine slept" />
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <ToggleSwitch IsChecked="{Binding ExposeToNetwork}"
+                      OnContent="Open to network" OffContent="This machine only"
+                      ToolTip.Tip="Adds a port-scoped forward (0.0.0.0) and a firewall allow rule for the vLLM port only — nothing else on your network is touched, and turning it off removes exactly those two entries. Needs admin (UAC). The API has no authentication." />
+        <TextBlock Text="{Binding NetworkStatus}" VerticalAlignment="Center" FontSize="12" Opacity="0.75"
+                   TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
+                   ToolTip.Tip="{Binding NetworkStatus}" />
+      </StackPanel>
     </StackPanel>
 
     <Border Grid.Row="3" Background="#18000000" CornerRadius="8" Padding="10">
