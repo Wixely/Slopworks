@@ -8,7 +8,13 @@ namespace Slopworks.App.ViewModels;
 
 public partial class DashboardViewModel(SlopworksHost host) : ObservableObject
 {
+    public const string BypassKind = "bypass";
+    public const string ForceKind = "force";
+
     public ObservableCollection<StepStatusItemViewModel> Steps { get; } = [];
+
+    /// <summary>Active bypass/force overrides, each removable to restore the original check.</summary>
+    public ObservableCollection<OverrideChipViewModel> Overrides { get; } = [];
 
     [ObservableProperty]
     private string _profileSummary = "Probing machine…";
@@ -28,6 +34,7 @@ public partial class DashboardViewModel(SlopworksHost host) : ObservableObject
         IsRefreshing = true;
         try
         {
+            RebuildOverrideChips();
             var (engine, profile) = await host.CreateEngineAsync(CancellationToken.None);
 
             ProfileSummary = profile.Gpu is { } gpu
@@ -91,6 +98,25 @@ public partial class DashboardViewModel(SlopworksHost host) : ObservableObject
             host.Config.Forces.Add(forceKey);
             Slopworks.Core.Config.ConfigStore.Save(host.Paths, host.Config);
         }
+
+        RefreshCommand.Execute(null);
+    }
+
+    private void RebuildOverrideChips()
+    {
+        Overrides.Clear();
+        foreach (var key in host.Config.Bypasses)
+            Overrides.Add(new OverrideChipViewModel(BypassKind, key, RemoveOverride));
+        foreach (var key in host.Config.Forces)
+            Overrides.Add(new OverrideChipViewModel(ForceKind, key, RemoveOverride));
+    }
+
+    /// <summary>Un-bypass / un-force: restores the original check and re-detects.</summary>
+    private void RemoveOverride(string kind, string key)
+    {
+        var list = kind == BypassKind ? host.Config.Bypasses : host.Config.Forces;
+        if (list.Remove(key))
+            Slopworks.Core.Config.ConfigStore.Save(host.Paths, host.Config);
 
         RefreshCommand.Execute(null);
     }
