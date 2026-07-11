@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Slopworks.Core.Config;
@@ -33,7 +34,15 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject
     [ObservableProperty]
     private string _networkStatus = "";
 
+    /// <summary>OpenAI-compatible base URLs to point an agent/client at (local first, LAN when exposed).</summary>
+    public ObservableCollection<string> AgentUrls { get; } = [$"{host.Server.BaseUrl}/v1"];
+
+    public string AgentHint =>
+        $"Point your agent's base_url at one of these. Model id: '{Model}'. Any API key is accepted (no auth).";
+
     private bool _applyingExposure;
+
+    partial void OnModelChanged(string value) => OnPropertyChanged(nameof(AgentHint));
 
     private IProcessRunner Runner => new RecordingProcessRunner(
         host.ProcessRunner, host.CommandLog, "server-ui", "user-click");
@@ -79,6 +88,9 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject
 
     private void UpdateNetworkStatus(bool enabled, int port)
     {
+        AgentUrls.Clear();
+        AgentUrls.Add($"http://localhost:{port}/v1");
+
         if (!enabled)
         {
             NetworkStatus = "Server is reachable from this machine only (localhost).";
@@ -86,8 +98,11 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject
         }
 
         var addresses = host.NetworkExposure.GetLanAddresses();
+        foreach (var address in addresses)
+            AgentUrls.Add($"http://{address}:{port}/v1");
+
         NetworkStatus = addresses.Count > 0
-            ? $"Reachable on your network: {string.Join("  ", addresses.Select(a => $"http://{a}:{port}/v1"))} — no authentication, trusted networks only."
+            ? "Reachable from other machines on your network — no authentication, trusted networks only."
             : $"Port {port} is open to the network, but no LAN address was found to display.";
     }
 
