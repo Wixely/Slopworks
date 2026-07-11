@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     branches: [master]
+    tags: ['v*']
   pull_request:
     branches: [master]
   workflow_dispatch:
@@ -49,3 +50,40 @@ jobs:
         with:
           name: Slopworks-win-x64
           path: publish/
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish single-file app (win-x64)
+        run: >
+          dotnet publish src/Slopworks.App/Slopworks.App.csproj
+          -c Release -r win-x64 --self-contained
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:ContinuousIntegrationBuild=true
+          -p:Version=$("$env:GITHUB_REF_NAME".TrimStart('v'))
+          -o publish
+
+      - name: Zip release
+        run: Compress-Archive -Path publish/* -DestinationPath "Slopworks-$env:GITHUB_REF_NAME-win-x64.zip"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$env:GITHUB_REF_NAME"
+          "Slopworks-$env:GITHUB_REF_NAME-win-x64.zip"
+          --title "Slopworks $env:GITHUB_REF_NAME"
+          --generate-notes
