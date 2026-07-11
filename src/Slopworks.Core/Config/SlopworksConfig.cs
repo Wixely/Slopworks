@@ -56,7 +56,12 @@ public sealed class ServerConfig
     /// </summary>
     public bool ExposeToNetwork { get; set; }
     public string Model { get; set; } = "Qwen/Qwen2.5-0.5B-Instruct";
+
+    /// <summary>Extra vLLM arguments, appended after the model (e.g. --max-model-len 8192).</summary>
     public List<string> ExtraArgs { get; set; } = [];
+
+    /// <summary>Extra podman arguments, inserted before the image (e.g. --memory 24g, -v mounts).</summary>
+    public List<string> ExtraContainerArgs { get; set; } = [];
     public string? HfToken { get; set; }
     public double GpuMemoryUtilization { get; set; } = 0.90;
 }

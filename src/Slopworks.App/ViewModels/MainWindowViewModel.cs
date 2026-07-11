@@ -8,6 +8,7 @@ public partial class MainWindowViewModel : ObservableObject
     public SetupWizardViewModel Wizard { get; }
     public ServerViewModel Server { get; }
     public MaintenanceViewModel Maintenance { get; }
+    public SettingsViewModel Settings { get; }
 
     public MainWindowViewModel(SlopworksHost host)
     {
@@ -15,6 +16,7 @@ public partial class MainWindowViewModel : ObservableObject
         Wizard = new SetupWizardViewModel(host);
         Server = new ServerViewModel(host);
         Maintenance = new MaintenanceViewModel(host);
+        Settings = new SettingsViewModel(host);
         Dashboard.RefreshCommand.Execute(null);
         Maintenance.RefreshCommand.Execute(null);
     }

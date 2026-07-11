@@ -47,6 +47,7 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
         else
             args.Add("-e VLLM_CPU_KVCACHE_SPACE=8");
 
+        args.AddRange(config.Server.ExtraContainerArgs);
         args.Add(image);
         args.Add($"--model {model}");
         if (profile.GpuPresent)

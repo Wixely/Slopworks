@@ -1,0 +1,97 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Slopworks.App.ViewModels"
+             x:Class="Slopworks.App.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+  <Grid Margin="20" RowDefinitions="Auto,*">
+
+    <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,12">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+          <Button Content="Save" Command="{Binding SaveCommand}" Classes="accent" />
+          <Button Content="Discard changes" Command="{Binding DiscardChangesCommand}" />
+        </StackPanel>
+        <TextBlock Text="Settings" FontSize="26" FontWeight="Bold" />
+      </DockPanel>
+      <TextBlock Text="{Binding StatusText}" Opacity="0.75" TextWrapping="Wrap"
+                 MaxLines="2" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusText}" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="1">
+      <StackPanel Spacing="18" MaxWidth="760" HorizontalAlignment="Left">
+
+        <StackPanel Spacing="8">
+          <TextBlock Text="vLLM server" FontWeight="SemiBold" FontSize="16" />
+          <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" >
+            <TextBlock Grid.Row="0" Text="Port" VerticalAlignment="Center" />
+            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Port}" Margin="0,2" />
+            <TextBlock Grid.Row="1" Text="Model (HuggingFace id)" VerticalAlignment="Center" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Model}" Margin="0,2" />
+            <TextBlock Grid.Row="2" Text="GPU memory utilization" VerticalAlignment="Center" />
+            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding GpuMemoryUtilization}" Margin="0,2" />
+            <TextBlock Grid.Row="3" Text="HuggingFace token" VerticalAlignment="Center" />
+            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding HfToken}" PasswordChar="•" Margin="0,2" />
+            <TextBlock Grid.Row="4" Text="Extra vLLM arguments" VerticalAlignment="Top" Margin="0,6,0,0"
+                       ToolTip.Tip="Appended after --model. One argument per line, e.g. --max-model-len 8192" />
+            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding ExtraVllmArgs}" AcceptsReturn="True"
+                     MinHeight="56" FontFamily="Consolas,Menlo,monospace" FontSize="12" Margin="0,2"
+                     PlaceholderText="--max-model-len 8192&#x0a;--dtype float16" />
+            <TextBlock Grid.Row="5" Text="Extra container arguments" VerticalAlignment="Top" Margin="0,6,0,0"
+                       ToolTip.Tip="Podman flags inserted before the image. One per line, e.g. --memory 24g" />
+            <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding ExtraContainerArgs}" AcceptsReturn="True"
+                     MinHeight="56" FontFamily="Consolas,Menlo,monospace" FontSize="12" Margin="0,2"
+                     PlaceholderText="--memory 24g" />
+          </Grid>
+        </StackPanel>
+
+        <StackPanel Spacing="8">
+          <TextBlock Text="Container images" FontWeight="SemiBold" FontSize="16" />
+          <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto">
+            <TextBlock Grid.Row="0" Text="GPU image" VerticalAlignment="Center" />
+            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding GpuImage}" Margin="0,2" />
+            <TextBlock Grid.Row="1" Text="CPU image" VerticalAlignment="Center" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CpuImage}" Margin="0,2" />
+          </Grid>
+        </StackPanel>
+
+        <StackPanel Spacing="8">
+          <TextBlock Text="Distro source" FontWeight="SemiBold" FontSize="16" />
+          <ToggleSwitch IsChecked="{Binding UseWslCatalog}"
+                        OnContent="Official WSL catalog" OffContent="Custom rootfs tarball" />
+          <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto">
+            <TextBlock Grid.Row="0" Text="Catalog distro name" VerticalAlignment="Center"
+                       ToolTip.Tip="As listed by: wsl --list --online" />
+            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CatalogDistroName}" Margin="0,2" />
+            <TextBlock Grid.Row="1" Text="Rootfs URL (tarball mode)" VerticalAlignment="Center" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding RootfsUrl}" Margin="0,2" />
+            <TextBlock Grid.Row="2" Text="Checksum URL (tarball mode)" VerticalAlignment="Center" />
+            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding RootfsChecksumUrl}" Margin="0,2" />
+          </Grid>
+        </StackPanel>
+
+        <StackPanel Spacing="8">
+          <TextBlock Text="Network &amp; behavior" FontWeight="SemiBold" FontSize="16" />
+          <Grid ColumnDefinitions="220,*" RowDefinitions="Auto">
+            <TextBlock Text="Proxy (http://host:port)" VerticalAlignment="Center"
+                       ToolTip.Tip="Propagated to downloads, apt inside the distro, and the container's model downloads" />
+            <TextBox Grid.Column="1" Text="{Binding Proxy}" Margin="0,2" />
+          </Grid>
+          <CheckBox IsChecked="{Binding AllowSystemProxy}" Content="Use the system proxy when none is set above" />
+          <CheckBox IsChecked="{Binding AutoApproveInsideRoot}"
+                    Content="In safe mode, skip prompts for file writes confined to the Slopworks folder" />
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <TextBlock Text="{Binding PreviewLabel}" FontWeight="SemiBold" FontSize="13" />
+          <Border Background="#18000000" CornerRadius="8" Padding="10">
+            <SelectableTextBlock Text="{Binding CommandPreview}" FontFamily="Consolas,Menlo,monospace"
+                                 FontSize="12" TextWrapping="Wrap" Opacity="0.9" />
+          </Border>
+          <TextBlock Text="The token is masked here; the real value is injected via an environment variable at start."
+                     FontSize="11" Opacity="0.55" />
+        </StackPanel>
+
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

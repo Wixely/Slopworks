@@ -20,5 +20,8 @@
     <TabItem Header="Maintenance">
       <views:MaintenanceView DataContext="{Binding Maintenance}" />
     </TabItem>
+    <TabItem Header="Settings">
+      <views:SettingsView DataContext="{Binding Settings}" />
+    </TabItem>
   </TabControl>
 </Window>
