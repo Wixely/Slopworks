@@ -126,6 +126,44 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
         }
     }
 
+    /// <summary>Model ids the server currently reports at /v1/models; empty if unreachable.</summary>
+    public async Task<IReadOnlyList<string>> GetServedModelsAsync(CancellationToken ct)
+    {
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(TimeSpan.FromSeconds(5));
+            using var response = await http.GetAsync($"{BaseUrl}/v1/models", timeout.Token);
+            if (!response.IsSuccessStatusCode)
+                return [];
+
+            using var doc = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync(timeout.Token));
+            if (!doc.RootElement.TryGetProperty("data", out var data) || data.ValueKind != System.Text.Json.JsonValueKind.Array)
+                return [];
+
+            var ids = new List<string>();
+            foreach (var model in data.EnumerateArray())
+            {
+                if (model.TryGetProperty("id", out var id) && id.GetString() is { } value)
+                    ids.Add(value);
+            }
+
+            return ids;
+        }
+        catch (HttpRequestException)
+        {
+            return [];
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return [];
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return [];
+        }
+    }
+
     /// <summary>One round-trip completion, used by the smoke test and the test panel.</summary>
     public async Task<string> CompleteAsync(string model, string prompt, CancellationToken ct)
     {
