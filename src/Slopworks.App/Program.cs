@@ -12,6 +12,10 @@ public static class Program
         if (args is ["--elevated-worker", var requestFile])
             return ElevatedWorker.Run(requestFile);
 
+        // Headless commands (start/stop/status/--help): run and exit without a window.
+        if (CliRunner.IsCliCommand(args))
+            return CliRunner.Run(args);
+
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         return 0;
     }
