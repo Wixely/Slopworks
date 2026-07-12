@@ -16,4 +16,13 @@ public partial class ServerView : UserControl
             await clipboard.SetTextAsync(url);
         }
     }
+
+    private async void CopyModel_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is ViewModels.ServerViewModel vm
+            && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+        {
+            await clipboard.SetTextAsync(vm.Model);
+        }
+    }
 }
