@@ -37,6 +37,7 @@ public sealed class SlopworksHost
     public required VllmServerController Server { get; init; }
     public required INetworkExposure NetworkExposure { get; init; }
     public required ISystemMetrics Metrics { get; init; }
+    public required IGpuMetrics GpuMetrics { get; init; }
 
     /// <summary>Non-null when the current mode is safe; the UI drains its Pending channel.</summary>
     public InteractiveGate? InteractiveGate { get; private set; }
@@ -73,6 +74,7 @@ public sealed class SlopworksHost
             Server = new VllmServerController(linux, config, http),
             NetworkExposure = new WindowsNetworkExposure(),
             Metrics = new WindowsSystemMetrics(),
+            GpuMetrics = new WindowsGpuMetrics(),
         };
     }
 
