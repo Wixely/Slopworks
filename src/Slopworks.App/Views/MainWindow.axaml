@@ -8,7 +8,7 @@
         Icon="/Assets/icon.png"
         Width="1080" Height="720"
         WindowStartupLocation="CenterScreen">
-  <TabControl Margin="4">
+  <TabControl Margin="4" SelectedIndex="{Binding SelectedTabIndex}">
     <TabItem Header="Dashboard">
       <views:DashboardView DataContext="{Binding Dashboard}" />
     </TabItem>

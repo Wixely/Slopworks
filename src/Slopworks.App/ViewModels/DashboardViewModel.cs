@@ -17,7 +17,7 @@ public partial class DashboardViewModel(SlopworksHost host) : ObservableObject
     public ObservableCollection<OverrideChipViewModel> Overrides { get; } = [];
 
     [ObservableProperty]
-    private string _profileSummary = "Probing machine…";
+    private string _profileSummary = "Press Refresh to check setup status.";
 
     [ObservableProperty]
     private string _rootSummary = $"Data root: {host.Paths.Root}";
