@@ -4,7 +4,14 @@
     <OutputType>WinExe</OutputType>
     <RootNamespace>Slopworks.App</RootNamespace>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Embedded as a win32 resource in the exe; no loose icon file ships. -->
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Compiled into the assembly (avares://); the window loads it from resources. -->
+    <AvaloniaResource Include="Assets\icon.png" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Slopworks.Core\Slopworks.Core.csproj" />

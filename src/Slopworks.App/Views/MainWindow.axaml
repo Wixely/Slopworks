@@ -5,6 +5,7 @@
         x:Class="Slopworks.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="Slopworks"
+        Icon="/Assets/icon.png"
         Width="1080" Height="720"
         WindowStartupLocation="CenterScreen">
   <TabControl Margin="4">
