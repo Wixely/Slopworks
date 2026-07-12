@@ -17,6 +17,9 @@
     <TabItem Header="Server">
       <views:ServerView DataContext="{Binding Server}" />
     </TabItem>
+    <TabItem Header="System">
+      <views:SystemUsageView DataContext="{Binding SystemUsage}" />
+    </TabItem>
     <TabItem Header="Maintenance">
       <views:MaintenanceView DataContext="{Binding Maintenance}" />
     </TabItem>

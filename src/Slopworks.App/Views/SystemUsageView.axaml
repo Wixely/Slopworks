@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Slopworks.App.ViewModels"
+             x:Class="Slopworks.App.Views.SystemUsageView"
+             x:DataType="vm:SystemUsageViewModel">
+  <StackPanel Margin="20" Spacing="18" MaxWidth="720" HorizontalAlignment="Left">
+
+    <TextBlock Text="System" FontSize="26" FontWeight="Bold" />
+    <TextBlock Text="Whole-machine usage (includes WSL and the vLLM container), sampled every second."
+               Opacity="0.7" TextWrapping="Wrap" />
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="{Binding CpuLabel}" FontWeight="SemiBold" />
+      <ProgressBar Minimum="0" Maximum="100" Value="{Binding CpuPercent}" Height="26" CornerRadius="6" />
+    </StackPanel>
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="{Binding RamLabel}" FontWeight="SemiBold" />
+      <ProgressBar Minimum="0" Maximum="100" Value="{Binding RamPercent}" Height="26" CornerRadius="6" />
+    </StackPanel>
+
+  </StackPanel>
+</UserControl>

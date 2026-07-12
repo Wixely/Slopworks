@@ -9,6 +9,7 @@ public partial class MainWindowViewModel : ObservableObject
     public ServerViewModel Server { get; }
     public MaintenanceViewModel Maintenance { get; }
     public SettingsViewModel Settings { get; }
+    public SystemUsageViewModel SystemUsage { get; }
 
     public MainWindowViewModel(SlopworksHost host)
     {
@@ -17,6 +18,7 @@ public partial class MainWindowViewModel : ObservableObject
         Server = new ServerViewModel(host);
         Maintenance = new MaintenanceViewModel(host);
         Settings = new SettingsViewModel(host);
+        SystemUsage = new SystemUsageViewModel(host);
         Dashboard.RefreshCommand.Execute(null);
         Maintenance.RefreshCommand.Execute(null);
     }
