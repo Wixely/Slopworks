@@ -31,12 +31,19 @@
           <DataTemplate x:DataType="vm:GpuUsageItemViewModel">
             <StackPanel Spacing="6" Margin="0,10,0,0">
               <TextBlock Text="{Binding Header}" FontWeight="SemiBold" FontSize="15" />
-              <TextBlock Text="{Binding UtilizationLabel}" FontSize="13" Opacity="0.85" />
-              <ProgressBar Minimum="0" Maximum="100" Value="{Binding UtilizationPercent}" Height="26" CornerRadius="6"
-                           Foreground="#15803D" />
-              <TextBlock Text="{Binding VramLabel}" FontSize="13" Opacity="0.85" />
-              <ProgressBar Minimum="0" Maximum="100" Value="{Binding VramPercent}" Height="26" CornerRadius="6"
-                           Foreground="#4ADE80" />
+              <!-- Processing (left) and VRAM (right) share a row, like CPU/RAM above. -->
+              <Grid ColumnDefinitions="*,20,*">
+                <StackPanel Grid.Column="0" Spacing="6">
+                  <TextBlock Text="{Binding UtilizationLabel}" FontSize="13" Opacity="0.85" />
+                  <ProgressBar Minimum="0" Maximum="100" Value="{Binding UtilizationPercent}" Height="26" CornerRadius="6"
+                               Foreground="#15803D" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Spacing="6">
+                  <TextBlock Text="{Binding VramLabel}" FontSize="13" Opacity="0.85" />
+                  <ProgressBar Minimum="0" Maximum="100" Value="{Binding VramPercent}" Height="26" CornerRadius="6"
+                               Foreground="#4ADE80" />
+                </StackPanel>
+              </Grid>
             </StackPanel>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
