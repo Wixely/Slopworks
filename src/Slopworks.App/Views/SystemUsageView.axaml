@@ -10,25 +10,33 @@
       <TextBlock Text="Whole-machine usage (includes WSL and the vLLM container), sampled every second."
                  Opacity="0.7" TextWrapping="Wrap" />
 
-      <StackPanel Spacing="6">
-        <TextBlock Text="{Binding CpuLabel}" FontWeight="SemiBold" />
-        <ProgressBar Minimum="0" Maximum="100" Value="{Binding CpuPercent}" Height="26" CornerRadius="6" />
-      </StackPanel>
+      <!-- CPU (left) and RAM (right) share a row. CPU is processing → darker blue;
+           RAM is memory → lighter blue. -->
+      <Grid ColumnDefinitions="*,20,*">
+        <StackPanel Grid.Column="0" Spacing="6">
+          <TextBlock Text="{Binding CpuLabel}" FontWeight="SemiBold" />
+          <ProgressBar Minimum="0" Maximum="100" Value="{Binding CpuPercent}" Height="26" CornerRadius="6"
+                       Foreground="#1D4ED8" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Spacing="6">
+          <TextBlock Text="{Binding RamLabel}" FontWeight="SemiBold" />
+          <ProgressBar Minimum="0" Maximum="100" Value="{Binding RamPercent}" Height="26" CornerRadius="6"
+                       Foreground="#60A5FA" />
+        </StackPanel>
+      </Grid>
 
-      <StackPanel Spacing="6">
-        <TextBlock Text="{Binding RamLabel}" FontWeight="SemiBold" />
-        <ProgressBar Minimum="0" Maximum="100" Value="{Binding RamPercent}" Height="26" CornerRadius="6" />
-      </StackPanel>
-
+      <!-- GPU is green; processing → darker green, VRAM → lighter green. -->
       <ItemsControl ItemsSource="{Binding Gpus}" IsVisible="{Binding HasGpus}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:GpuUsageItemViewModel">
             <StackPanel Spacing="6" Margin="0,10,0,0">
               <TextBlock Text="{Binding Header}" FontWeight="SemiBold" FontSize="15" />
               <TextBlock Text="{Binding UtilizationLabel}" FontSize="13" Opacity="0.85" />
-              <ProgressBar Minimum="0" Maximum="100" Value="{Binding UtilizationPercent}" Height="26" CornerRadius="6" />
+              <ProgressBar Minimum="0" Maximum="100" Value="{Binding UtilizationPercent}" Height="26" CornerRadius="6"
+                           Foreground="#15803D" />
               <TextBlock Text="{Binding VramLabel}" FontSize="13" Opacity="0.85" />
-              <ProgressBar Minimum="0" Maximum="100" Value="{Binding VramPercent}" Height="26" CornerRadius="6" />
+              <ProgressBar Minimum="0" Maximum="100" Value="{Binding VramPercent}" Height="26" CornerRadius="6"
+                           Foreground="#4ADE80" />
             </StackPanel>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
