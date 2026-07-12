@@ -10,6 +10,7 @@ public partial class MainWindowViewModel : ObservableObject
     public MaintenanceViewModel Maintenance { get; }
     public SettingsViewModel Settings { get; }
     public SystemUsageViewModel SystemUsage { get; }
+    public LogsViewModel Logs { get; }
 
     public MainWindowViewModel(SlopworksHost host)
     {
@@ -19,7 +20,9 @@ public partial class MainWindowViewModel : ObservableObject
         Maintenance = new MaintenanceViewModel(host);
         Settings = new SettingsViewModel(host);
         SystemUsage = new SystemUsageViewModel(host);
+        Logs = new LogsViewModel(host);
         Dashboard.RefreshCommand.Execute(null);
         Maintenance.RefreshCommand.Execute(null);
+        Logs.RefreshCommand.Execute(null);
     }
 }

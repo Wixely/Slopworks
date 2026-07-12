@@ -6,7 +6,19 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <!-- Embedded as a win32 resource in the exe; no loose icon file ships. -->
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    <!-- Symbols live inside the assembly (still get line numbers in stack traces for
+         diagnostics) so no separate managed .pdb files are emitted or shipped. -->
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
+
+  <!-- Native dependencies (SkiaSharp/HarfBuzz) still bring their own .pdb into publish;
+       strip every .pdb from the published output so release archives carry none. -->
+  <Target Name="RemovePdbsFromPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <_PublishedPdbs Include="$(PublishDir)**\*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(_PublishedPdbs)" />
+  </Target>
 
   <ItemGroup>
     <!-- Compiled into the assembly (avares://); the window loads it from resources. -->
