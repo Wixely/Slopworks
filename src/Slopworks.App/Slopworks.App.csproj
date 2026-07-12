@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Slopworks.Core\Slopworks.Core.csproj" />
     <ProjectReference Include="..\Slopworks.Platform.Windows\Slopworks.Platform.Windows.csproj" />
+    <ProjectReference Include="..\Slopworks.Platform.Linux\Slopworks.Platform.Linux.csproj" />
   </ItemGroup>
 
   <ItemGroup>

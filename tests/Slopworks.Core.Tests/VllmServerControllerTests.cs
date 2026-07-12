@@ -9,7 +9,8 @@ namespace Slopworks.Core.Tests;
 public class VllmServerControllerTests
 {
     private static VllmServerController Build(SlopworksConfig config)
-        => new(new WslLinuxCommandFactory(SlopworksPaths.DistroName), config, new HttpClient());
+        => new(new WslLinuxCommandFactory(SlopworksPaths.DistroName), config, new HttpClient(),
+            new SlopworksPaths(Path.Combine(Path.GetTempPath(), "slopworks-tests")));
 
     private static SystemProfile GpuProfile => new()
     {

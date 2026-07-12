@@ -16,7 +16,9 @@ public sealed class DistroBaseStep(ILinuxCommandFactory linux) : ISetupStep
     public string Title => "Distro base setup";
     public IReadOnlyList<string> DependsOn => ["wsl.import"];
 
-    public bool AppliesTo(SystemProfile profile) => true;
+    // Windows-only: a Linux host already has systemd, and Slopworks never re-provisions
+    // (or restarts!) the user's own machine.
+    public bool AppliesTo(SystemProfile profile) => OperatingSystem.IsWindows();
 
     public async Task<StepDetection> DetectAsync(StepContext ctx, CancellationToken ct)
     {

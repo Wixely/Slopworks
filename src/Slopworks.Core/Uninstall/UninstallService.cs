@@ -26,7 +26,7 @@ public sealed class UninstallService(
     ILinuxCommandFactory linux,
     INetworkExposure network,
     IShellIntegration shell,
-    IWslBackend wsl,
+    IWslBackend? wsl,
     string? appDataPointerDir = null)
 {
     private string PointerDir => appDataPointerDir ?? Path.GetDirectoryName(RootLocator.PointerFile)!;
@@ -35,20 +35,27 @@ public sealed class UninstallService(
     public const string ServerId = "server";
     public const string DistroId = "distro";
     public const string DownloadsId = "downloads";
+    public const string ImagesId = "images";
     public const string StartupId = "startup";
     public const string DataId = "data";
     public const string WslId = "wsl";
 
-    /// <summary>Safe removal order; WSL last and only ever by explicit opt-in.</summary>
-    public static readonly IReadOnlyList<string> RemovalOrder =
-        [NetworkId, ServerId, DistroId, DownloadsId, StartupId, DataId];
+    /// <summary>Safe removal order for this platform; WSL last and only ever by explicit opt-in.</summary>
+    public static IReadOnlyList<string> RemovalOrder => OperatingSystem.IsWindows()
+        ? [NetworkId, ServerId, DistroId, DownloadsId, StartupId, DataId]
+        : [NetworkId, ServerId, ImagesId, StartupId, DataId];
 
-    public const string WhatRemains =
-        "Things Slopworks deliberately does not remove:\n" +
-        "• The NVIDIA Windows driver (removing display drivers can break your screen; uninstall via Windows Settings → Apps).\n" +
-        "• The Windows optional features behind WSL (Virtual Machine Platform / Windows Subsystem for Linux) — other software may use them; disable via OptionalFeatures.exe if truly unwanted.\n" +
-        "• Anything installed via winget at your request (e.g. Nvidia.App) — remove with winget uninstall.\n" +
-        "• The Slopworks executable itself — delete it whenever you like; it stores nothing outside the folders listed above.";
+    public static string WhatRemains => OperatingSystem.IsWindows()
+        ? "Things Slopworks deliberately does not remove:\n" +
+          "• The NVIDIA Windows driver (removing display drivers can break your screen; uninstall via Windows Settings → Apps).\n" +
+          "• The Windows optional features behind WSL (Virtual Machine Platform / Windows Subsystem for Linux) — other software may use them; disable via OptionalFeatures.exe if truly unwanted.\n" +
+          "• Anything installed via winget at your request (e.g. Nvidia.App) — remove with winget uninstall.\n" +
+          "• The Slopworks executable itself — delete it whenever you like; it stores nothing outside the folders listed above."
+        : "Things Slopworks deliberately does not remove:\n" +
+          "• The NVIDIA driver (removing it can break your display; use Software & Updates → Additional Drivers).\n" +
+          "• apt packages installed during setup — other software may use them; remove manually with:\n" +
+          "    sudo apt remove podman nvidia-container-toolkit ubuntu-drivers-common\n" +
+          "• The Slopworks executable itself — delete it whenever you like; it stores nothing outside the folders listed above.";
 
     public async Task<IReadOnlyList<CleanupStatus>> GetStatusAsync(IProcessRunner runner, CancellationToken ct)
     {
@@ -70,16 +77,25 @@ public sealed class UninstallService(
             networkOpen ? $"Port {port} is currently open to the network." : "Not active."));
 
         statuses.Add(await GetContainerStatusAsync(runner, ct));
-        statuses.Add(await GetDistroStatusAsync(ct));
 
-        var downloadsPresent = Directory.Exists(paths.RootfsDir)
-            && Directory.EnumerateFiles(paths.RootfsDir).Any();
-        statuses.Add(new CleanupStatus(DownloadsId, "Downloaded files",
-            "Rootfs tarballs in downloads/",
-            downloadsPresent,
-            downloadsPresent
-                ? $"{Directory.EnumerateFiles(paths.RootfsDir).Sum(f => new FileInfo(f).Length) / 1024 / 1024} MB in {paths.RootfsDir}"
-                : "Nothing downloaded."));
+        if (OperatingSystem.IsWindows())
+        {
+            statuses.Add(await GetDistroStatusAsync(ct));
+
+            var downloadsPresent = Directory.Exists(paths.RootfsDir)
+                && Directory.EnumerateFiles(paths.RootfsDir).Any();
+            statuses.Add(new CleanupStatus(DownloadsId, "Downloaded files",
+                "Rootfs tarballs in downloads/",
+                downloadsPresent,
+                downloadsPresent
+                    ? $"{Directory.EnumerateFiles(paths.RootfsDir).Sum(f => new FileInfo(f).Length) / 1024 / 1024} MB in {paths.RootfsDir}"
+                    : "Nothing downloaded."));
+        }
+        else
+        {
+            // On a Linux host images live in the user's podman storage, not inside a vhdx.
+            statuses.Add(await GetImagesStatusAsync(runner, ct));
+        }
 
         statuses.Add(new CleanupStatus(StartupId, "Startup resume script",
             "Reopens Slopworks after a mid-setup reboot",
@@ -87,12 +103,38 @@ public sealed class UninstallService(
             shell.ResumeOnStartupInstalled ? "Installed in the Startup folder." : "Not installed."));
 
         statuses.Add(new CleanupStatus(DataId, "Slopworks data folder",
-            $"Config, state, journal and logs at {paths.Root} (plus the pointer file in %APPDATA%)",
+            $"Config, state, journal, logs{(OperatingSystem.IsWindows() ? "" : " and model cache")} at {paths.Root} (plus the pointer file)",
             Directory.Exists(paths.Root),
             Directory.Exists(paths.Root) ? $"Exists at {paths.Root}." : "Already removed."));
 
-        statuses.Add(await GetWslStatusAsync(ct));
+        if (OperatingSystem.IsWindows())
+            statuses.Add(await GetWslStatusAsync(ct));
         return statuses;
+    }
+
+    private async Task<CleanupStatus> GetImagesStatusAsync(IProcessRunner runner, CancellationToken ct)
+    {
+        var present = false;
+        var detail = "No vLLM images in podman storage.";
+        try
+        {
+            var probe = await runner.RunAsync(
+                linux.Command($"podman images --format '{{{{.Repository}}}}:{{{{.Tag}}}}' 2>/dev/null || true"), null, ct);
+            var relevant = probe.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(i => config.Images.Gpu.Contains(i, StringComparison.OrdinalIgnoreCase)
+                         || config.Images.Cpu.Contains(i, StringComparison.OrdinalIgnoreCase)
+                         || i.Contains("vllm", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            present = relevant.Count > 0;
+            if (present)
+                detail = $"Present: {string.Join(", ", relevant)}.";
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+        }
+
+        return new CleanupStatus(ImagesId, "vLLM container images",
+            "Pulled images in this user's podman storage", present, detail);
     }
 
     private async Task<CleanupStatus> GetContainerStatusAsync(IProcessRunner runner, CancellationToken ct)
@@ -119,7 +161,7 @@ public sealed class UninstallService(
 
     private async Task<CleanupStatus> GetDistroStatusAsync(CancellationToken ct)
     {
-        var registered = (await wsl.ListDistrosAsync(ct))
+        var registered = (await (wsl?.ListDistrosAsync(ct) ?? Task.FromResult<IReadOnlyList<string>>([])))
             .Any(d => string.Equals(d, SlopworksPaths.DistroName, StringComparison.OrdinalIgnoreCase));
         var vhdx = Path.Combine(paths.DistroDir, "ext4.vhdx");
         var present = registered || File.Exists(vhdx);
@@ -140,9 +182,13 @@ public sealed class UninstallService(
 
     private async Task<CleanupStatus> GetWslStatusAsync(CancellationToken ct)
     {
+        if (wsl is null)
+            return new CleanupStatus(WslId, "WSL itself (system-wide)", "Not applicable on this platform", false, "n/a");
+
         var status = await wsl.GetStatusAsync(ct);
         var present = status.Kind != WslInstallKind.NotInstalled;
         var others = (await wsl.ListDistrosAsync(ct))
+
             .Where(d => !string.Equals(d, SlopworksPaths.DistroName, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
@@ -191,6 +237,12 @@ public sealed class UninstallService(
                         Directory.Delete(paths.DownloadsDir, recursive: true);
                     return new CleanupResult(id, true, "Downloaded files deleted.");
 
+                case ImagesId:
+                    await runner.RunAsync(
+                        linux.Command($"podman rmi -f {config.Images.Gpu} {config.Images.Cpu} 2>/dev/null || true"),
+                        output, ct);
+                    return new CleanupResult(id, true, "vLLM container images removed from podman storage.");
+
                 case StartupId:
                     shell.RemoveResumeOnStartup();
                     return new CleanupResult(id, true, "Startup script removed.");
@@ -226,7 +278,9 @@ public sealed class UninstallService(
         bool includeWsl, IProcessRunner runner, IProgress<string>? output, CancellationToken ct)
     {
         var results = new List<CleanupResult>();
-        IReadOnlyList<string> order = includeWsl ? [.. RemovalOrder, WslId] : RemovalOrder;
+        IReadOnlyList<string> order = includeWsl && OperatingSystem.IsWindows()
+            ? [.. RemovalOrder, WslId]
+            : RemovalOrder;
 
         foreach (var id in order)
         {

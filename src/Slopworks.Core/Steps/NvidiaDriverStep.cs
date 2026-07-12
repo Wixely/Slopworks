@@ -98,12 +98,34 @@ public sealed class NvidiaDriverStep : ISetupStep
             ActionId: "gpu.driver.install",
             StepId: Id,
             Kind: ActionKind.ExecuteElevated,
-            Description: "Install the latest NVIDIA driver (winget if available; otherwise opens NVIDIA's driver page)",
-            Detail: $"winget install --exact --id {string.Join(" | ", WingetCandidates)} --silent  →  fallback: open {DriverDownloadPage}",
+            Description: "Install the NVIDIA driver — pick how",
+            Detail: $"default: winget install (auto mode takes this); alternative: open {DriverDownloadPage}",
             InsideSlopworksRoot: false,
-            Execute: ExecuteAsync);
+            Execute: ExecuteAsync)
+        {
+            Choices =
+            [
+                new ActionChoice(
+                    "Install automatically via winget",
+                    $"winget install --exact --id {string.Join(" | ", WingetCandidates)} --silent (falls back to the driver page if unavailable)",
+                    ExecuteAsync),
+                new ActionChoice(
+                    "Open NVIDIA's driver page (install manually)",
+                    DriverDownloadPage,
+                    OpenDriverPageAsync),
+            ],
+        };
 
         return Task.FromResult<IReadOnlyList<PlannedAction>>([action]);
+    }
+
+    private static async Task<ActionResult> OpenDriverPageAsync(ActionExecutionContext exec, CancellationToken ct)
+    {
+        exec.Output.Report($"Opening {DriverDownloadPage} — pick your card, install, then re-run setup.");
+        await TryRunAsync(exec, new ProcessSpec("cmd.exe", ["/c", "start", "", DriverDownloadPage]), ct);
+        return ActionResult.Failure(
+            "Waiting on a manual driver install — install from the NVIDIA page, then re-run setup " +
+            "(or press Bypass on this step to continue CPU-only).");
     }
 
     private static async Task<ActionResult> ExecuteAsync(ActionExecutionContext exec, CancellationToken ct)

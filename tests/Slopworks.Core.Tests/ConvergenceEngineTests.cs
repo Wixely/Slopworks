@@ -235,6 +235,48 @@ public class ConvergenceEngineTests
     }
 
     [Fact]
+    public async Task ChoiceAction_ExecutesTheChosenAlternative()
+    {
+        var gate = new ScriptedGate(ActionDecision.Approved) { ChoiceIndex = 1 };
+        var harness = new EngineHarness { Gate = gate };
+        var executed = new List<string>();
+        var step = new FakeStep { Id = "a", Detections = [StepDetection.Missing("missing"), StepDetection.Ok("ok")] };
+        step.Plan.Add(EngineHarness.Action("a", "pick") with
+        {
+            Choices =
+            [
+                new ActionChoice("default", "d", (_, _) => { executed.Add("default"); return Task.FromResult(ActionResult.Success()); }),
+                new ActionChoice("alternative", "a", (_, _) => { executed.Add("alternative"); return Task.FromResult(ActionResult.Success()); }),
+            ],
+        });
+
+        var result = await harness.Build(step).ConvergeAsync(harness.Progress, CancellationToken.None);
+
+        Assert.Equal(RunStatus.Converged, result.Status);
+        Assert.Equal(["alternative"], executed);
+    }
+
+    [Fact]
+    public async Task ChoiceAction_AutoGateTakesTheDefault()
+    {
+        var harness = new EngineHarness(); // AutoApproveGate
+        var executed = new List<string>();
+        var step = new FakeStep { Id = "a", Detections = [StepDetection.Missing("missing"), StepDetection.Ok("ok")] };
+        step.Plan.Add(EngineHarness.Action("a", "pick") with
+        {
+            Choices =
+            [
+                new ActionChoice("default", "d", (_, _) => { executed.Add("default"); return Task.FromResult(ActionResult.Success()); }),
+                new ActionChoice("alternative", "a", (_, _) => { executed.Add("alternative"); return Task.FromResult(ActionResult.Success()); }),
+            ],
+        });
+
+        await harness.Build(step).ConvergeAsync(harness.Progress, CancellationToken.None);
+
+        Assert.Equal(["default"], executed);
+    }
+
+    [Fact]
     public async Task DetectAll_SurvivesThrowingStep()
     {
         var harness = new EngineHarness();

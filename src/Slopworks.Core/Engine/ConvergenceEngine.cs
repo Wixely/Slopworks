@@ -149,7 +149,8 @@ public sealed class ConvergenceEngine
                 ct.ThrowIfCancellationRequested();
                 progress?.Report(new EngineEvent.ActionPending(action));
 
-                var decision = await _services.Gate.RequestAsync(action, ct);
+                var gateResult = await _services.Gate.RequestAsync(action, ct);
+                var decision = gateResult.Decision;
                 progress?.Report(new EngineEvent.ActionDecided(action.ActionId, decision));
 
                 switch (decision)
@@ -163,7 +164,7 @@ public sealed class ConvergenceEngine
                         return new ConvergeResult(RunStatus.Failed, step.Id, $"Action denied: {action.Description}");
                 }
 
-                var actionResult = await ExecuteActionAsync(step, action, decision, progress, ct);
+                var actionResult = await ExecuteActionAsync(step, action, gateResult, progress, ct);
                 progress?.Report(new EngineEvent.ActionCompleted(action.ActionId, actionResult));
 
                 if (!actionResult.Succeeded)
@@ -206,13 +207,14 @@ public sealed class ConvergenceEngine
     }
 
     private async Task<ActionResult> ExecuteActionAsync(
-        ISetupStep step, PlannedAction action, ActionDecision decision,
+        ISetupStep step, PlannedAction action, GateResult gateResult,
         IProgress<EngineEvent>? progress, CancellationToken ct)
     {
-        var decisionLabel = decision switch
+        var decisionLabel = gateResult.Decision switch
         {
             ActionDecision.ApprovedAllForStep => "approved-all",
             _ when _services.Gate is AutoApproveGate => "auto",
+            _ when action.Choices is { Count: > 0 } => $"approved-choice-{gateResult.ChoiceIndex}",
             _ => "approved",
         };
 
@@ -227,7 +229,7 @@ public sealed class ConvergenceEngine
 
         try
         {
-            return await action.Execute(execCtx, ct);
+            return await action.ResolveExecute(gateResult.ChoiceIndex)(execCtx, ct);
         }
         catch (OperationCanceledException)
         {

@@ -3,19 +3,23 @@ using Microsoft.Extensions.Logging;
 
 namespace Slopworks.Core.Actions;
 
-/// <summary>Auto mode: approves everything. The command log still records each decision as "auto".</summary>
+/// <summary>Auto mode: approves everything with the default choice. Still logged as "auto".</summary>
 public sealed class AutoApproveGate(ILogger logger) : IActionGate
 {
-    public Task<ActionDecision> RequestAsync(PlannedAction action, CancellationToken ct)
+    public Task<GateResult> RequestAsync(PlannedAction action, CancellationToken ct)
     {
         logger.LogInformation("Auto-approved [{Kind}] {Description}: {Detail}", action.Kind, action.Description, action.Detail);
-        return Task.FromResult(ActionDecision.Approved);
+        return Task.FromResult(GateResult.Approved);
     }
 }
 
-public sealed record PendingApproval(PlannedAction Action, TaskCompletionSource<ActionDecision> Decision)
+public sealed record PendingApproval(PlannedAction Action, TaskCompletionSource<GateResult> Decision)
 {
-    public void Resolve(ActionDecision decision) => Decision.TrySetResult(decision);
+    public void Resolve(ActionDecision decision) => Decision.TrySetResult(new GateResult(decision));
+
+    /// <summary>Approve via a specific choice (index into Action.Choices).</summary>
+    public void ResolveChoice(int choiceIndex)
+        => Decision.TrySetResult(new GateResult(ActionDecision.Approved, choiceIndex));
 }
 
 /// <summary>
@@ -30,27 +34,27 @@ public sealed class InteractiveGate : IActionGate
 
     public ChannelReader<PendingApproval> Pending => _pending.Reader;
 
-    public async Task<ActionDecision> RequestAsync(PlannedAction action, CancellationToken ct)
+    public async Task<GateResult> RequestAsync(PlannedAction action, CancellationToken ct)
     {
         lock (_lock)
         {
             if (_approvedSteps.Contains(action.StepId))
-                return ActionDecision.Approved;
+                return GateResult.Approved;
         }
 
-        var tcs = new TaskCompletionSource<ActionDecision>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var tcs = new TaskCompletionSource<GateResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         await _pending.Writer.WriteAsync(new PendingApproval(action, tcs), ct);
 
         await using var registration = ct.Register(() => tcs.TrySetCanceled(ct));
-        var decision = await tcs.Task;
+        var result = await tcs.Task;
 
-        if (decision == ActionDecision.ApprovedAllForStep)
+        if (result.Decision == ActionDecision.ApprovedAllForStep)
         {
             lock (_lock)
                 _approvedSteps.Add(action.StepId);
         }
 
-        return decision;
+        return result;
     }
 }
 
@@ -61,13 +65,13 @@ public sealed class InteractiveGate : IActionGate
 /// </summary>
 public sealed class PolicyGate(IActionGate inner, bool autoApproveInsideRoot) : IActionGate
 {
-    public Task<ActionDecision> RequestAsync(PlannedAction action, CancellationToken ct)
+    public Task<GateResult> RequestAsync(PlannedAction action, CancellationToken ct)
     {
         var isRootConfinedFileOp = action.InsideSlopworksRoot
             && action.Kind is ActionKind.WriteFile or ActionKind.DeleteFile;
 
         return autoApproveInsideRoot && isRootConfinedFileOp
-            ? Task.FromResult(ActionDecision.Approved)
+            ? Task.FromResult(GateResult.Approved)
             : inner.RequestAsync(action, ct);
     }
 }

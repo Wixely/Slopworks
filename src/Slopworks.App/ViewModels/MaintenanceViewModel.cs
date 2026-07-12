@@ -46,6 +46,9 @@ public partial class MaintenanceViewModel(SlopworksHost host) : ObservableObject
 
     public string WhatRemains => UninstallService.WhatRemains;
 
+    /// <summary>The WSL opt-in only exists on Windows.</summary>
+    public bool ShowWslOption => OperatingSystem.IsWindows();
+
     private UninstallService Service => new(
         host.Paths, host.Config, host.Linux, host.NetworkExposure, host.ShellIntegration, host.Wsl);
 

@@ -76,6 +76,8 @@ public sealed class PreflightStep : ISetupStep
 
         if (profile.TotalMemoryBytes > 0 && profile.TotalMemoryBytes < RecommendedMemoryBytes)
             warnings.Add($"{profile.TotalMemoryBytes / (1024 * 1024 * 1024)} GB RAM — WSL + vLLM may be tight, prefer small models");
+        if (profile.UbuntuVersion is { } ubuntu && ubuntu < new Version(22, 4))
+            warnings.Add($"Ubuntu {ubuntu} is older than 22.04 — podman/nvidia-container-toolkit packages may be too old");
         if (!profile.GpuPresent)
             warnings.Add("no NVIDIA GPU — inference will run on CPU (slow, demo-grade)");
 

@@ -168,7 +168,7 @@ public partial class SettingsViewModel : ObservableObject
             Network = new NetworkConfig { Proxy = string.IsNullOrWhiteSpace(Proxy) ? null : Proxy.Trim() },
         };
 
-        var controller = new VllmServerController(_host.Linux, preview, new HttpClient());
+        var controller = new VllmServerController(_host.Linux, preview, new HttpClient(), _host.Paths);
         CommandPreview = controller.BuildRunCommand(_profile, preview.Server.Model);
         PreviewLabel = _profile.GpuPresent
             ? "Command this machine will run (GPU mode):"

@@ -10,6 +10,7 @@ using Slopworks.Core.Server;
 using Slopworks.Core.State;
 using Slopworks.Core.Steps;
 using Slopworks.Platform.Abstractions;
+using Slopworks.Platform.Linux;
 using Slopworks.Platform.Windows;
 using Slopworks.Platform.Windows.Elevation;
 using Slopworks.Platform.Windows.Wsl;
@@ -26,7 +27,9 @@ public sealed class SlopworksHost
     public required SlopworksConfig Config { get; init; }
     public required ILogger Logger { get; init; }
     public required IStateJournal Journal { get; init; }
-    public required IWslBackend Wsl { get; init; }
+
+    /// <summary>Null on Linux hosts — there is no WSL layer.</summary>
+    public required IWslBackend? Wsl { get; init; }
     public required ISystemInfoProvider SystemInfo { get; init; }
     public required IProcessRunner ProcessRunner { get; init; }
     public required ICommandLog CommandLog { get; init; }
@@ -51,31 +54,62 @@ public sealed class SlopworksHost
         var logger = new FileLoggerProvider(paths.LogsDir).CreateLogger("Slopworks");
         var commandLog = new FileCommandLog(paths.LogsDir);
         var direct = new SystemProcessRunner();
-        var runner = new CompositeProcessRunner(direct, new ElevatedProcessRunner(paths.ElevatedDir));
-        var probes = new RecordingProcessRunner(runner, commandLog, "probe", "read-only");
         var journal = FileStateJournal.Load(paths.JournalFile);
         var http = SlopworksHttpClient.Create(config.Network);
-        var linux = new WslLinuxCommandFactory(SlopworksPaths.DistroName);
 
-        return new SlopworksHost
+        // The single per-OS branch: every platform-specific service is chosen here.
+        if (OperatingSystem.IsWindows())
         {
-            Paths = paths,
-            Config = config,
-            Logger = logger,
-            Journal = journal,
-            Wsl = new WindowsWslBackend(probes),
-            SystemInfo = new WindowsSystemInfo(paths, probes),
-            ProcessRunner = runner,
-            CommandLog = commandLog,
-            Resolver = new ArtifactResolver(config, journal, http, logger),
-            Downloader = new Downloader(http),
-            ShellIntegration = new WindowsShellIntegration(runner),
-            Linux = linux,
-            Server = new VllmServerController(linux, config, http),
-            NetworkExposure = new WindowsNetworkExposure(),
-            Metrics = new WindowsSystemMetrics(),
-            GpuMetrics = new WindowsGpuMetrics(),
-        };
+            var runner = new CompositeProcessRunner(direct, new ElevatedProcessRunner(paths.ElevatedDir));
+            var probes = new RecordingProcessRunner(runner, commandLog, "probe", "read-only");
+            var linux = new WslLinuxCommandFactory(SlopworksPaths.DistroName);
+
+            return new SlopworksHost
+            {
+                Paths = paths,
+                Config = config,
+                Logger = logger,
+                Journal = journal,
+                Wsl = new WindowsWslBackend(probes),
+                SystemInfo = new WindowsSystemInfo(paths, probes),
+                ProcessRunner = runner,
+                CommandLog = commandLog,
+                Resolver = new ArtifactResolver(config, journal, http, logger),
+                Downloader = new Downloader(http),
+                ShellIntegration = new WindowsShellIntegration(runner),
+                Linux = linux,
+                Server = new VllmServerController(linux, config, http, paths),
+                NetworkExposure = new WindowsNetworkExposure(),
+                Metrics = new WindowsSystemMetrics(),
+                GpuMetrics = new WindowsGpuMetrics(),
+            };
+        }
+        else
+        {
+            var runner = new PkexecProcessRunner(direct);
+            var probes = new RecordingProcessRunner(runner, commandLog, "probe", "read-only");
+            var linux = new HostLinuxCommandFactory();
+
+            return new SlopworksHost
+            {
+                Paths = paths,
+                Config = config,
+                Logger = logger,
+                Journal = journal,
+                Wsl = null,
+                SystemInfo = new LinuxSystemInfo(paths, probes),
+                ProcessRunner = runner,
+                CommandLog = commandLog,
+                Resolver = new ArtifactResolver(config, journal, http, logger),
+                Downloader = new Downloader(http),
+                ShellIntegration = new LinuxShellIntegration(runner),
+                Linux = linux,
+                Server = new VllmServerController(linux, config, http, paths),
+                NetworkExposure = new LinuxNetworkExposure(),
+                Metrics = new LinuxSystemMetrics(),
+                GpuMetrics = new LinuxGpuMetrics(),
+            };
+        }
     }
 
     public async Task<(ConvergenceEngine Engine, SystemProfile Profile)> CreateEngineAsync(CancellationToken ct)
@@ -92,8 +126,11 @@ public sealed class SlopworksHost
             Probes = new RecordingProcessRunner(ProcessRunner, CommandLog, "probe", "read-only"),
         };
 
-        var engine = new ConvergenceEngine(
-            StepCatalog.CreateWindowsSteps(Wsl, Resolver, Downloader, Linux, Server), new EngineServices
+        var steps = OperatingSystem.IsWindows()
+            ? StepCatalog.CreateWindowsSteps(Wsl!, Resolver, Downloader, Linux, Server)
+            : StepCatalog.CreateLinuxSteps(Linux, Server);
+
+        var engine = new ConvergenceEngine(steps, new EngineServices
         {
             StepContext = context,
             Gate = BuildGate(),

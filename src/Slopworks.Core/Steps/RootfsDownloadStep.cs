@@ -17,7 +17,7 @@ public sealed class RootfsDownloadStep(IArtifactResolver resolver, Downloader do
     public string Title => "Linux rootfs image";
     public IReadOnlyList<string> DependsOn => ["preflight"];
 
-    public bool AppliesTo(SystemProfile profile) => true;
+    public bool AppliesTo(SystemProfile profile) => OperatingSystem.IsWindows();
 
     public Task<StepDetection> DetectAsync(StepContext ctx, CancellationToken ct)
     {

@@ -9,7 +9,9 @@ public sealed class PodmanInstallStep(ILinuxCommandFactory linux) : ISetupStep
 {
     public string Id => "distro.podman";
     public string Title => "Podman container runtime";
-    public IReadOnlyList<string> DependsOn => ["distro.base"];
+
+    /// <summary>Windows needs the provisioned distro first; on a Linux host apt is right there.</summary>
+    public IReadOnlyList<string> DependsOn => OperatingSystem.IsWindows() ? ["distro.base"] : ["preflight"];
 
     public bool AppliesTo(SystemProfile profile) => true;
 

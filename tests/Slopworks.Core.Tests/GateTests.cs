@@ -15,8 +15,21 @@ public class InteractiveGateTests
         var pending = await gate.Pending.ReadAsync();
         pending.Resolve(ActionDecision.Approved);
 
-        Assert.Equal(ActionDecision.Approved, await request);
+        Assert.Equal(ActionDecision.Approved, (await request).Decision);
         Assert.Equal("x", pending.Action.ActionId);
+    }
+
+    [Fact]
+    public async Task ResolveChoice_CarriesTheChosenIndex()
+    {
+        var gate = new InteractiveGate();
+
+        var request = gate.RequestAsync(EngineHarness.Action("step", "x"), CancellationToken.None);
+        (await gate.Pending.ReadAsync()).ResolveChoice(2);
+
+        var result = await request;
+        Assert.Equal(ActionDecision.Approved, result.Decision);
+        Assert.Equal(2, result.ChoiceIndex);
     }
 
     [Fact]
@@ -26,11 +39,11 @@ public class InteractiveGateTests
 
         var first = gate.RequestAsync(EngineHarness.Action("step", "one"), CancellationToken.None);
         (await gate.Pending.ReadAsync()).Resolve(ActionDecision.ApprovedAllForStep);
-        Assert.Equal(ActionDecision.ApprovedAllForStep, await first);
+        Assert.Equal(ActionDecision.ApprovedAllForStep, (await first).Decision);
 
         // Second action for the same step must not surface a prompt.
         var second = await gate.RequestAsync(EngineHarness.Action("step", "two"), CancellationToken.None);
-        Assert.Equal(ActionDecision.Approved, second);
+        Assert.Equal(ActionDecision.Approved, second.Decision);
         Assert.False(gate.Pending.TryRead(out _));
     }
 
@@ -47,7 +60,7 @@ public class InteractiveGateTests
         var pending = await gate.Pending.ReadAsync();
         Assert.Equal("two", pending.Action.ActionId);
         pending.Resolve(ActionDecision.Denied);
-        Assert.Equal(ActionDecision.Denied, await other);
+        Assert.Equal(ActionDecision.Denied, (await other).Decision);
     }
 
     [Fact]
@@ -74,10 +87,10 @@ public class PolicyGateTests
         var inner = new ScriptedGate(ActionDecision.Denied);
         var gate = new PolicyGate(inner, autoApproveInsideRoot: true);
 
-        var decision = await gate.RequestAsync(
+        var result = await gate.RequestAsync(
             EngineHarness.Action("step", "x", kind: kind, insideRoot: true), CancellationToken.None);
 
-        Assert.Equal(ActionDecision.Approved, decision);
+        Assert.Equal(ActionDecision.Approved, result.Decision);
         Assert.Empty(inner.Requests);
     }
 
@@ -87,10 +100,10 @@ public class PolicyGateTests
         var inner = new ScriptedGate(ActionDecision.Denied);
         var gate = new PolicyGate(inner, autoApproveInsideRoot: true);
 
-        var decision = await gate.RequestAsync(
+        var result = await gate.RequestAsync(
             EngineHarness.Action("step", "x", kind: ActionKind.Execute, insideRoot: true), CancellationToken.None);
 
-        Assert.Equal(ActionDecision.Denied, decision);
+        Assert.Equal(ActionDecision.Denied, result.Decision);
         Assert.Single(inner.Requests);
     }
 
@@ -100,10 +113,10 @@ public class PolicyGateTests
         var inner = new ScriptedGate(ActionDecision.Denied);
         var gate = new PolicyGate(inner, autoApproveInsideRoot: true);
 
-        var decision = await gate.RequestAsync(
+        var result = await gate.RequestAsync(
             EngineHarness.Action("step", "x", kind: ActionKind.WriteFile, insideRoot: false), CancellationToken.None);
 
-        Assert.Equal(ActionDecision.Denied, decision);
+        Assert.Equal(ActionDecision.Denied, result.Decision);
     }
 
     [Fact]

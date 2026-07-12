@@ -37,10 +37,17 @@ public sealed class ActionExecutionContext
     public required IProgress<string> Output { get; init; }
 }
 
+/// <summary>One selectable way to carry out a choice action.</summary>
+public sealed record ActionChoice(
+    string Label,
+    string Detail,
+    Func<ActionExecutionContext, CancellationToken, Task<ActionResult>> Execute);
+
 /// <summary>
 /// A single side effect a step wants to perform. Description is the human summary;
 /// Detail is the verbatim command line / URL / file path, shown unedited on the
-/// confirmation card in safe mode.
+/// confirmation card in safe mode. When Choices is set, safe mode offers one approve
+/// button per choice and auto mode takes the first (the default); Execute is ignored.
 /// </summary>
 public sealed record PlannedAction(
     string ActionId,
@@ -49,4 +56,12 @@ public sealed record PlannedAction(
     string Description,
     string Detail,
     bool InsideSlopworksRoot,
-    Func<ActionExecutionContext, CancellationToken, Task<ActionResult>> Execute);
+    Func<ActionExecutionContext, CancellationToken, Task<ActionResult>> Execute)
+{
+    public IReadOnlyList<ActionChoice>? Choices { get; init; }
+
+    public Func<ActionExecutionContext, CancellationToken, Task<ActionResult>> ResolveExecute(int choiceIndex)
+        => Choices is { Count: > 0 } choices
+            ? choices[Math.Clamp(choiceIndex, 0, choices.Count - 1)].Execute
+            : Execute;
+}

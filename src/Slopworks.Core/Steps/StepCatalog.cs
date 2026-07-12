@@ -23,7 +23,23 @@ public static class StepCatalog
         new DistroImportStep(wsl),
         new DistroBaseStep(linux),
         new PodmanInstallStep(linux),
-        new NvidiaToolkitStep(linux),
+        new NvidiaToolkitStep(linux, NvidiaToolkitStep.WslNvidiaSmi),
+        new ImagePullStep(linux),
+        new GpuSmokeTestStep(linux),
+        new VllmSmokeTestStep(server),
+    ];
+
+    /// <summary>
+    /// Ubuntu host: no WSL layer — podman runs rootless on the host, provisioning is
+    /// apt-via-pkexec, and everything from the container runtime up is the same code.
+    /// </summary>
+    public static IReadOnlyList<ISetupStep> CreateLinuxSteps(
+        ILinuxCommandFactory linux, VllmServerController server) =>
+    [
+        new PreflightStep(),
+        new LinuxNvidiaDriverStep(linux),
+        new PodmanInstallStep(linux),
+        new NvidiaToolkitStep(linux, NvidiaToolkitStep.HostNvidiaSmi),
         new ImagePullStep(linux),
         new GpuSmokeTestStep(linux),
         new VllmSmokeTestStep(server),

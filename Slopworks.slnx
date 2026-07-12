@@ -3,10 +3,12 @@
     <Project Path="src/Slopworks.App/Slopworks.App.csproj" />
     <Project Path="src/Slopworks.Core/Slopworks.Core.csproj" />
     <Project Path="src/Slopworks.Platform.Abstractions/Slopworks.Platform.Abstractions.csproj" />
+    <Project Path="src/Slopworks.Platform.Linux/Slopworks.Platform.Linux.csproj" />
     <Project Path="src/Slopworks.Platform.Windows/Slopworks.Platform.Windows.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Slopworks.Core.Tests/Slopworks.Core.Tests.csproj" />
+    <Project Path="tests/Slopworks.Platform.Linux.Tests/Slopworks.Platform.Linux.Tests.csproj" />
     <Project Path="tests/Slopworks.Platform.Windows.Tests/Slopworks.Platform.Windows.Tests.csproj" />
   </Folder>
 </Solution>

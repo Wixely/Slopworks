@@ -9,8 +9,14 @@ namespace Slopworks.Core.Steps;
 /// Podman uses for --device nvidia.com/gpu=all. The CDI spec is keyed to the Windows driver
 /// version and regenerated after driver updates. The Windows driver itself is never touched.
 /// </summary>
-public sealed class NvidiaToolkitStep(ILinuxCommandFactory linux) : ISetupStep
+public sealed class NvidiaToolkitStep(ILinuxCommandFactory linux, string nvidiaSmiPath = NvidiaToolkitStep.WslNvidiaSmi) : ISetupStep
 {
+    /// <summary>Where the Windows driver surfaces nvidia-smi inside a WSL distro.</summary>
+    public const string WslNvidiaSmi = "/usr/lib/wsl/lib/nvidia-smi";
+
+    /// <summary>On a Linux host the driver's own binary is on PATH.</summary>
+    public const string HostNvidiaSmi = "nvidia-smi";
+
     public string Id => "distro.nvidia";
     public string Title => "NVIDIA container toolkit";
     public IReadOnlyList<string> DependsOn => ["distro.podman"];
@@ -20,7 +26,7 @@ public sealed class NvidiaToolkitStep(ILinuxCommandFactory linux) : ISetupStep
     public async Task<StepDetection> DetectAsync(StepContext ctx, CancellationToken ct)
     {
         var probe = await ctx.Probes.RunAsync(linux.Command(
-            "/usr/lib/wsl/lib/nvidia-smi -L 2>&1 | head -2; echo ---;" +
+            $"{nvidiaSmiPath} -L 2>&1 | head -2; echo ---;" +
             " command -v nvidia-ctk >/dev/null && echo CTK_OK || echo CTK_MISSING; echo ---;" +
             " test -f /etc/cdi/nvidia.yaml && echo CDI_OK || echo CDI_MISSING; echo ---;" +
             " cat /etc/slopworks/provisioned-nvidia 2>/dev/null"), null, ct);
@@ -37,8 +43,11 @@ public sealed class NvidiaToolkitStep(ILinuxCommandFactory linux) : ISetupStep
         if (!smi.Contains("GPU", StringComparison.OrdinalIgnoreCase))
         {
             return StepDetection.Broken(
-                "GPU passthrough is not working: /usr/lib/wsl/lib/nvidia-smi sees no GPU inside the distro. " +
-                "Update the Windows NVIDIA driver (it provides the WSL GPU stack).", probe.Stdout.Trim());
+                OperatingSystem.IsWindows()
+                    ? "GPU passthrough is not working: /usr/lib/wsl/lib/nvidia-smi sees no GPU inside the distro. " +
+                      "Update the Windows NVIDIA driver (it provides the WSL GPU stack)."
+                    : "nvidia-smi sees no GPU — the NVIDIA driver is not working; repair the driver step first.",
+                probe.Stdout.Trim());
         }
 
         if (ctk != "CTK_OK" || cdi != "CDI_OK")

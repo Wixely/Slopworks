@@ -14,11 +14,17 @@ public enum ActionDecision
     Aborted,
 }
 
+/// <summary>Gate verdict; ChoiceIndex selects among PlannedAction.Choices (0 = default).</summary>
+public sealed record GateResult(ActionDecision Decision, int ChoiceIndex = 0)
+{
+    public static GateResult Approved { get; } = new(ActionDecision.Approved);
+}
+
 /// <summary>
 /// Every side effect passes through a gate before executing. Safe mode routes each action
-/// to the user; auto mode approves everything (still logged).
+/// to the user; auto mode approves everything with the default choice (still logged).
 /// </summary>
 public interface IActionGate
 {
-    Task<ActionDecision> RequestAsync(PlannedAction action, CancellationToken ct);
+    Task<GateResult> RequestAsync(PlannedAction action, CancellationToken ct);
 }

@@ -1,14 +1,13 @@
 using System.Diagnostics;
 using System.Text;
-using Slopworks.Platform.Abstractions;
 
-namespace Slopworks.Platform.Windows;
+namespace Slopworks.Platform.Abstractions;
 
 /// <summary>
-/// Runs external processes with redirected, line-streamed output. Callers set
-/// ProcessSpec.StdoutEncoding to UTF-16LE for wsl.exe management commands and UTF-8 for
-/// commands executed inside a distro. Cancellation kills the whole process tree.
-/// Elevated execution is handled by the separate elevated-worker relaunch mechanism, not here.
+/// Runs external processes with redirected, line-streamed output — pure BCL, shared by all
+/// platforms. Callers set ProcessSpec.StdoutEncoding to UTF-16LE for wsl.exe management
+/// commands and UTF-8 everywhere else. Cancellation kills the whole process tree.
+/// Elevated execution is handled by each platform's elevation runner, not here.
 /// </summary>
 public sealed class SystemProcessRunner : IProcessRunner
 {
@@ -16,7 +15,7 @@ public sealed class SystemProcessRunner : IProcessRunner
     {
         if (spec.RequiresElevation)
             throw new NotSupportedException(
-                "Elevated processes must go through the elevated-worker relaunch, not SystemProcessRunner.");
+                "Elevated processes must go through the platform elevation runner, not SystemProcessRunner.");
 
         var psi = new ProcessStartInfo
         {

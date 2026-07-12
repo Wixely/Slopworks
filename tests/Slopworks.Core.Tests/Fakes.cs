@@ -57,11 +57,14 @@ internal sealed class ScriptedGate(params ActionDecision[] script) : IActionGate
 
     public List<PlannedAction> Requests { get; } = [];
 
-    public Task<ActionDecision> RequestAsync(PlannedAction action, CancellationToken ct)
+    /// <summary>Choice index returned with every approval (default 0).</summary>
+    public int ChoiceIndex { get; set; }
+
+    public Task<GateResult> RequestAsync(PlannedAction action, CancellationToken ct)
     {
         Requests.Add(action);
         var decision = _next < script.Length ? script[_next++] : ActionDecision.Approved;
-        return Task.FromResult(decision);
+        return Task.FromResult(new GateResult(decision, ChoiceIndex));
     }
 }
 

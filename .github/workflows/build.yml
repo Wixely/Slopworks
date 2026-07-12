@@ -10,7 +10,11 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -26,17 +30,24 @@ jobs:
       - name: Build
         run: dotnet build Slopworks.slnx --no-restore -c Release
 
-      - name: Test
-        run: dotnet test Slopworks.slnx --no-build -c Release --logger "trx;LogFileName=results.trx"
+      - name: Test (cross-platform projects)
+        run: |
+          dotnet test tests/Slopworks.Core.Tests --no-build -c Release --logger "trx;LogFileName=core.trx"
+          dotnet test tests/Slopworks.Platform.Linux.Tests --no-build -c Release --logger "trx;LogFileName=linux.trx"
+
+      - name: Test (Windows-only project)
+        if: runner.os == 'Windows'
+        run: dotnet test tests/Slopworks.Platform.Windows.Tests --no-build -c Release --logger "trx;LogFileName=windows.trx"
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-${{ matrix.os }}
           path: '**/TestResults/*.trx'
 
       - name: Publish single-file app (win-x64)
+        if: runner.os == 'Windows'
         run: >
           dotnet publish src/Slopworks.App/Slopworks.App.csproj
           -c Release -r win-x64 --self-contained
@@ -45,10 +56,20 @@ jobs:
           -p:ContinuousIntegrationBuild=true
           -o publish
 
+      - name: Publish single-file app (linux-x64)
+        if: runner.os == 'Linux'
+        run: >
+          dotnet publish src/Slopworks.App/Slopworks.App.csproj
+          -c Release -r linux-x64 --self-contained
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:ContinuousIntegrationBuild=true
+          -o publish
+
       - name: Upload app artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Slopworks-win-x64
+          name: Slopworks-${{ runner.os == 'Windows' && 'win-x64' || 'linux-x64' }}
           path: publish/
 
   release:
@@ -87,3 +108,38 @@ jobs:
           "Slopworks-$env:GITHUB_REF_NAME-win-x64.zip"
           --title "Slopworks $env:GITHUB_REF_NAME"
           --generate-notes
+
+  release-linux:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish single-file app (linux-x64)
+        run: >
+          dotnet publish src/Slopworks.App/Slopworks.App.csproj
+          -c Release -r linux-x64 --self-contained
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:ContinuousIntegrationBuild=true
+          -p:Version="${GITHUB_REF_NAME#v}"
+          -o publish
+
+      - name: Tar release (preserves the executable bit)
+        run: |
+          chmod +x publish/Slopworks.App
+          tar -czf "Slopworks-${GITHUB_REF_NAME}-linux-x64.tar.gz" -C publish .
+
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" "Slopworks-${GITHUB_REF_NAME}-linux-x64.tar.gz"

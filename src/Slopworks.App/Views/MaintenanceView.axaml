@@ -23,6 +23,7 @@
         <StackPanel Spacing="4">
           <TextBlock Text="Undo all changes Slopworks has made to this machine" FontWeight="SemiBold" />
           <CheckBox IsChecked="{Binding IncludeWslInFullRemoval}"
+                    IsVisible="{Binding ShowWslOption}"
                     Content="Also remove WSL itself (system-wide — read the warning on the WSL item below first)" />
         </StackPanel>
       </DockPanel>

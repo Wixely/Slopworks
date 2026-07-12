@@ -70,10 +70,12 @@ public class UninstallServiceTests : IDisposable
 
         var statuses = await service.GetStatusAsync(new FakeProcessRunner(), CancellationToken.None);
 
-        Assert.Equal(
-            [UninstallService.NetworkId, UninstallService.ServerId, UninstallService.DistroId,
-             UninstallService.DownloadsId, UninstallService.StartupId, UninstallService.DataId, UninstallService.WslId],
-            statuses.Select(s => s.Id));
+        string[] expected = OperatingSystem.IsWindows()
+            ? [UninstallService.NetworkId, UninstallService.ServerId, UninstallService.DistroId,
+               UninstallService.DownloadsId, UninstallService.StartupId, UninstallService.DataId, UninstallService.WslId]
+            : [UninstallService.NetworkId, UninstallService.ServerId, UninstallService.ImagesId,
+               UninstallService.StartupId, UninstallService.DataId];
+        Assert.Equal(expected, statuses.Select(s => s.Id));
     }
 
     [Fact]
@@ -123,13 +125,16 @@ public class UninstallServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RemoveEverything_WithOptIn_RunsWslLast()
+    public async Task RemoveEverything_WithOptIn_RunsWslLast_OnWindowsOnly()
     {
         var (service, _, _) = Build();
 
         var results = await service.RemoveEverythingAsync(true, new FakeProcessRunner(), null, CancellationToken.None);
 
-        Assert.Equal(UninstallService.WslId, results[^1].Id);
+        if (OperatingSystem.IsWindows())
+            Assert.Equal(UninstallService.WslId, results[^1].Id);
+        else
+            Assert.DoesNotContain(results, r => r.Id == UninstallService.WslId);
     }
 
     [Fact]

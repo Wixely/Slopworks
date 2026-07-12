@@ -23,6 +23,9 @@ public sealed record SystemProfile
     /// <summary>Null when not yet probed; false when virtualization is definitively unavailable.</summary>
     public bool? VirtualizationEnabled { get; init; }
 
+    /// <summary>Set on Ubuntu hosts (from /etc/os-release); null elsewhere.</summary>
+    public Version? UbuntuVersion { get; init; }
+
     public bool GpuPresent => Gpu is not null;
 
     public static SystemProfile Unknown { get; } = new();

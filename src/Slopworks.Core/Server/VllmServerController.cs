@@ -12,10 +12,17 @@ public sealed record ServerHealth(string ContainerState, bool ApiHealthy);
 /// their own gating/attribution: wizard actions pass the gated runner, direct UI buttons
 /// pass an audited one (the click is the consent).
 /// </summary>
-public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksConfig config, HttpClient http)
+public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksConfig config, HttpClient http, SlopworksPaths paths)
 {
     public const string ContainerName = "slopworks-vllm";
-    public const string HfCachePath = "/opt/slopworks/hf";
+
+    /// <summary>
+    /// Model cache location: inside the vhdx on Windows (9p mounts are slow); directly in
+    /// the Slopworks data root on a Linux host (native filesystem, one-directory principle).
+    /// </summary>
+    public string HfCachePath => OperatingSystem.IsWindows()
+        ? "/opt/slopworks/hf"
+        : Path.Combine(paths.Root, "hf");
 
     public string BaseUrl => $"http://localhost:{config.Server.Port}";
 
@@ -25,10 +32,19 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
     public string BuildRunCommand(SystemProfile profile, string model)
     {
         var image = SelectImage(profile);
+
+        // Windows: WSL NAT already confines reachability (host exposure is the portproxy's
+        // job). Linux host: the publish address IS the exposure control.
+        var publish = OperatingSystem.IsWindows()
+            ? $"-p {config.Server.Port}:8000"
+            : config.Server.ExposeToNetwork
+                ? $"-p 0.0.0.0:{config.Server.Port}:8000"
+                : $"-p 127.0.0.1:{config.Server.Port}:8000";
+
         var args = new List<string>
         {
             "podman", "run", "-d", "--replace", $"--name {ContainerName}",
-            $"-p {config.Server.Port}:8000",
+            publish,
             $"-v {HfCachePath}:/root/.cache/huggingface",
         };
 
