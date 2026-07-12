@@ -1,11 +1,25 @@
 # Slopworks
 
 A desktop tool that sets up everything needed to run [vLLM](https://github.com/vllm-project/vllm)
-on a Windows machine — and then manages the running server.
+on a Windows or Ubuntu machine — and then manages the running server.
 
-vLLM has no native Windows support. Slopworks converges your machine to the one path that
-works well: WSL2 → a dedicated, self-contained Linux distro → Podman → the official
-`vllm/vllm-openai` container image, serving an OpenAI-compatible API on `localhost`.
+vLLM has no native Windows support. On Windows, Slopworks converges your machine to the one
+path that works well: WSL2 → a dedicated, self-contained Linux distro → Podman → the official
+`vllm/vllm-openai` container image, serving an OpenAI-compatible API on `localhost`. On Ubuntu
+the host is the Linux environment, so it goes straight to rootless Podman + the NVIDIA
+container toolkit.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Setup / Maintenance](docs/screenshots/maintenance.png) |
+| ![Server](docs/screenshots/server.png) | ![Settings](docs/screenshots/settings.png) |
+
+The **Dashboard** shows each setup step's live state (Missing / Partial / Broken / Ok); the
+**Maintenance** tab lists every change Slopworks made and undoes it individually or all at
+once; the **Server** tab gives copy-paste OpenAI endpoints for pointing an agent at the model;
+**Settings** exposes every vLLM/container knob with a live command preview.
 
 ## Principles
 
