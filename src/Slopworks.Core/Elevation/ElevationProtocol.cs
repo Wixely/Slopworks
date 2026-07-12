@@ -16,6 +16,9 @@ public sealed class ElevatedRequest
     public string? WorkingDir { get; set; }
     public string? StdinText { get; set; }
     public bool Utf16Output { get; set; }
+
+    /// <summary>Extra environment for the elevated child (e.g. WSL_UTF8=1 for wsl.exe).</summary>
+    public Dictionary<string, string>? Env { get; set; }
 }
 
 public sealed class ElevatedResponse

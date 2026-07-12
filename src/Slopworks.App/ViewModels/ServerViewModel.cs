@@ -160,8 +160,7 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject
         => await RunBusyAsync(async () =>
         {
             await Runner.RunAsync(
-                new ProcessSpec("wsl.exe", ["--shutdown"], StdoutEncoding: System.Text.Encoding.Unicode),
-                null, CancellationToken.None);
+                Slopworks.Core.Steps.WslCommands.Management(["--shutdown"]), null, CancellationToken.None);
             StatusText = "WSL restarted (this stops the server too). Start the server again.";
         });
 

@@ -39,5 +39,7 @@ public sealed class WslLinuxCommandFactory(string distroName) : ILinuxCommandFac
             StdinText: scriptText.ReplaceLineEndings("\n"));
 
     public ProcessSpec Terminate()
-        => new("wsl.exe", ["--terminate", distroName], StdoutEncoding: System.Text.Encoding.Unicode);
+        => new("wsl.exe", ["--terminate", distroName],
+            StdoutEncoding: System.Text.Encoding.UTF8,
+            Env: new Dictionary<string, string> { ["WSL_UTF8"] = "1" });
 }

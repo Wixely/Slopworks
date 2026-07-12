@@ -72,24 +72,41 @@ public sealed class WslFeatureStep(IWslBackend wsl) : ISetupStep
                         $"wsl {args[0]} failed (exit {result.ExitCode}): {TextUtil.Condense(result.Stderr + result.Stdout)}");
                 }
 
-                // Upgrading in place doesn't need a reboot; first-time feature enablement does.
-                return isLegacyUpgrade
-                    ? ActionResult.Success("Modern WSL installed over the legacy inbox version.")
-                    : ActionResult.NeedsReboot("WSL installed. Windows needs a restart to finish enabling it.");
+                // A fresh feature install always needs a reboot. An in-place upgrade usually
+                // doesn't — unless it also had to enable VirtualMachinePlatform, which wsl
+                // announces ("Changes will not be effective until the system is rebooted").
+                // Returning NeedsReboot short-circuits verification, so the immediate
+                // "virtualization unavailable" reading no longer looks like a failure.
+                var needsReboot = !isLegacyUpgrade || WslCommands.IndicatesRebootRequired(result.Stdout + result.Stderr);
+                return needsReboot
+                    ? ActionResult.NeedsReboot("WSL installed. Windows needs a restart to finish enabling it, then re-run setup.")
+                    : ActionResult.Success("Modern WSL installed over the legacy inbox version.");
             });
 
         return Task.FromResult<IReadOnlyList<PlannedAction>>([action]);
     }
 }
 
-/// <summary>Builders for wsl.exe invocations with the correct output encoding.</summary>
+/// <summary>Builders for wsl.exe invocations with correct, deterministic UTF-8 output.</summary>
 public static class WslCommands
 {
-    /// <summary>Management commands (--status, --install, --list ...) emit UTF-16LE on Windows.</summary>
-    public static ProcessSpec Management(IReadOnlyList<string> args)
-        => new("wsl.exe", args, StdoutEncoding: System.Text.Encoding.Unicode);
+    // WSL_UTF8=1 makes modern wsl.exe emit UTF-8 (not UTF-16LE) and plain, pipe-friendly
+    // progress text instead of the ANSI bar that garbles when redirected. Legacy pre-2022
+    // inbox wsl ignores it, but classification there is driven by exit codes, not text.
+    private static readonly IReadOnlyDictionary<string, string> Utf8Env =
+        new Dictionary<string, string> { ["WSL_UTF8"] = "1" };
 
-    /// <summary>Commands executed inside a distro emit UTF-8.</summary>
+    /// <summary>Management commands (--status, --install, --list, --update ...).</summary>
+    public static ProcessSpec Management(IReadOnlyList<string> args)
+        => new("wsl.exe", args, StdoutEncoding: System.Text.Encoding.UTF8, Env: Utf8Env);
+
+    /// <summary>Commands executed inside a distro.</summary>
     public static ProcessSpec InDistro(string distro, IReadOnlyList<string> command, string user = "root")
-        => new("wsl.exe", ["-d", distro, "-u", user, "--", .. command], StdoutEncoding: System.Text.Encoding.UTF8);
+        => new("wsl.exe", ["-d", distro, "-u", user, "--", .. command],
+            StdoutEncoding: System.Text.Encoding.UTF8, Env: Utf8Env);
+
+    /// <summary>True when wsl's own output says a Windows restart is required to take effect.</summary>
+    public static bool IndicatesRebootRequired(string output)
+        => output.Contains("reboot", StringComparison.OrdinalIgnoreCase)
+        || output.Contains("restart", StringComparison.OrdinalIgnoreCase);
 }

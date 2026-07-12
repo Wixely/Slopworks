@@ -226,8 +226,7 @@ public sealed class UninstallService(
                 case DistroId:
                     await runner.RunAsync(linux.Terminate(), output, ct);
                     await runner.RunAsync(
-                        new ProcessSpec("wsl.exe", ["--unregister", SlopworksPaths.DistroName],
-                            StdoutEncoding: System.Text.Encoding.Unicode), output, ct);
+                        Steps.WslCommands.Management(["--unregister", SlopworksPaths.DistroName]), output, ct);
                     if (Directory.Exists(paths.WslDir))
                         Directory.Delete(paths.WslDir, recursive: true);
                     return new CleanupResult(id, true, "Distro unregistered and its disk deleted.");
@@ -257,8 +256,7 @@ public sealed class UninstallService(
 
                 case WslId:
                     var result = await runner.RunAsync(
-                        new ProcessSpec("wsl.exe", ["--uninstall"],
-                            StdoutEncoding: System.Text.Encoding.Unicode, RequiresElevation: true), output, ct);
+                        Steps.WslCommands.Management(["--uninstall"]) with { RequiresElevation = true }, output, ct);
                     return result.Succeeded
                         ? new CleanupResult(id, true, "WSL uninstalled. Windows optional features remain (see What remains).")
                         : new CleanupResult(id, false, $"wsl --uninstall failed: {TextUtil.Condense(result.Stderr + result.Stdout, 200)}");

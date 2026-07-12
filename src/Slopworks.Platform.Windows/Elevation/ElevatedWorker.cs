@@ -21,6 +21,7 @@ public static class ElevatedWorker
                 request.Args,
                 WorkingDir: request.WorkingDir,
                 StdoutEncoding: request.Utf16Output ? Encoding.Unicode : Encoding.UTF8,
+                Env: request.Env,
                 StdinText: request.StdinText);
 
             var result = new SystemProcessRunner()

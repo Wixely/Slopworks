@@ -32,6 +32,7 @@ public sealed class ElevatedProcessRunner(string elevatedDir) : IProcessRunner
             WorkingDir = spec.WorkingDir,
             StdinText = spec.StdinText,
             Utf16Output = Equals(spec.StdoutEncoding, Encoding.Unicode),
+            Env = spec.Env?.ToDictionary(kv => kv.Key, kv => kv.Value),
         });
 
         try
