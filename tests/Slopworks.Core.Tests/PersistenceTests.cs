@@ -99,11 +99,12 @@ public class SlopworksPathsTests
     [Fact]
     public void Contains_IsTrueOnlyForPathsUnderRoot()
     {
-        var paths = new SlopworksPaths(@"C:\Slopworks");
+        var root = OperatingSystem.IsWindows() ? @"C:\Slopworks" : "/opt/slopworks";
+        var paths = new SlopworksPaths(root);
 
-        Assert.True(paths.Contains(@"C:\Slopworks\wsl\slopworks\ext4.vhdx"));
-        Assert.True(paths.Contains(@"C:\Slopworks"));
-        Assert.False(paths.Contains(@"C:\Windows\System32"));
-        Assert.False(paths.Contains(@"C:\SlopworksEvilTwin\file"));
+        Assert.True(paths.Contains(Path.Combine(root, "wsl", "slopworks", "ext4.vhdx")));
+        Assert.True(paths.Contains(root));
+        Assert.False(paths.Contains(OperatingSystem.IsWindows() ? @"C:\Windows\System32" : "/usr/bin"));
+        Assert.False(paths.Contains(root + "EvilTwin" + Path.DirectorySeparatorChar + "file"));
     }
 }

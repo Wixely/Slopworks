@@ -84,8 +84,15 @@ public class UninstallServiceTests : IDisposable
         var (service, _, _) = Build(distros: ["Ubuntu", "docker-desktop"]);
 
         var statuses = await service.GetStatusAsync(new FakeProcessRunner(), CancellationToken.None);
-        var wslStatus = statuses.Single(s => s.Id == UninstallService.WslId);
 
+        if (!OperatingSystem.IsWindows())
+        {
+            // No WSL layer exists on a Linux host, so no WSL cleanup item should either.
+            Assert.DoesNotContain(statuses, s => s.Id == UninstallService.WslId);
+            return;
+        }
+
+        var wslStatus = statuses.Single(s => s.Id == UninstallService.WslId);
         Assert.Contains("IN USE BY OTHER SYSTEMS", wslStatus.Warning);
         Assert.Contains("Ubuntu", wslStatus.Warning);
     }
