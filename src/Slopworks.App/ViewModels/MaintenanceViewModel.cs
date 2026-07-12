@@ -31,8 +31,19 @@ public partial class CleanupItemViewModel(CleanupStatus status, Func<string, Tas
 /// removable, plus remove-everything. Button clicks are the consent; commands are audited
 /// and elevation prompts via UAC where needed.
 /// </summary>
-public partial class MaintenanceViewModel(SlopworksHost host) : ObservableObject
+public partial class MaintenanceViewModel(SlopworksHost host) : ObservableObject, IActivatableTab
 {
+    private bool _loadedOnce;
+
+    /// <summary>Probes for removable components the first time the tab is viewed; Refresh re-runs.</summary>
+    public void Activate()
+    {
+        if (_loadedOnce)
+            return;
+        _loadedOnce = true;
+        RefreshCommand.Execute(null);
+    }
+
     public ObservableCollection<CleanupItemViewModel> Items { get; } = [];
 
     [ObservableProperty]

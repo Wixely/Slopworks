@@ -15,8 +15,11 @@ public sealed class LogFileItemViewModel(LogFileInfo info)
 /// Shows Slopworks' own logs (app, command audit, vLLM server) for diagnosing issues on any
 /// machine. Read-only tail view with a file picker, refresh, copy, and open-folder.
 /// </summary>
-public partial class LogsViewModel(SlopworksHost host) : ObservableObject
+public partial class LogsViewModel(SlopworksHost host) : ObservableObject, IActivatableTab
 {
+    /// <summary>Re-reads the log list each time the tab is shown (cheap file IO; logs grow).</summary>
+    public void Activate() => RefreshCommand.Execute(null);
+
     public ObservableCollection<LogFileItemViewModel> Files { get; } = [];
 
     public string LogsDir => host.Paths.LogsDir;

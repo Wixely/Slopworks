@@ -29,19 +29,29 @@ public partial class MainWindowViewModel : ObservableObject
         Settings = new SettingsViewModel(host);
         SystemUsage = new SystemUsageViewModel(host);
         Logs = new LogsViewModel(host);
-        Logs.RefreshCommand.Execute(null); // cheap file read
 
-        if (SetupState.IsComplete(host.Journal))
-        {
-            // Already set up: land on Server and leave the (slow) probes to a Refresh click.
-            SelectedTabIndex = ServerTab;
-        }
-        else
-        {
-            // Fresh/incomplete: land on the Dashboard and auto-diagnose to guide setup.
-            SelectedTabIndex = DashboardTab;
-            Dashboard.RefreshCommand.Execute(null);
-            Maintenance.RefreshCommand.Execute(null);
-        }
+        // Land on Server when already set up, else the Dashboard to guide setup. Each tab
+        // does its own work only once activated, so nothing probes until it is viewed.
+        // Set the backing field directly so we can activate the initial tab explicitly.
+        _selectedTabIndex = SetupState.IsComplete(host.Journal) ? ServerTab : DashboardTab;
+        (TabAt(_selectedTabIndex) as IActivatableTab)?.Activate();
     }
+
+    partial void OnSelectedTabIndexChanged(int oldValue, int newValue)
+    {
+        (TabAt(oldValue) as IActivatableTab)?.Deactivate();
+        (TabAt(newValue) as IActivatableTab)?.Activate();
+    }
+
+    private object TabAt(int index) => index switch
+    {
+        0 => Dashboard,
+        1 => Wizard,
+        2 => Server,
+        3 => SystemUsage,
+        4 => Maintenance,
+        5 => Settings,
+        6 => Logs,
+        _ => this,
+    };
 }

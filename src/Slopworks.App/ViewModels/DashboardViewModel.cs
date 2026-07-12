@@ -6,10 +6,21 @@ using Slopworks.Core.Engine;
 
 namespace Slopworks.App.ViewModels;
 
-public partial class DashboardViewModel(SlopworksHost host) : ObservableObject
+public partial class DashboardViewModel(SlopworksHost host) : ObservableObject, IActivatableTab
 {
     public const string BypassKind = "bypass";
     public const string ForceKind = "force";
+
+    private bool _loadedOnce;
+
+    /// <summary>Runs the diagnostics the first time the Dashboard is viewed; Refresh re-runs.</summary>
+    public void Activate()
+    {
+        if (_loadedOnce)
+            return;
+        _loadedOnce = true;
+        RefreshCommand.Execute(null);
+    }
 
     public ObservableCollection<StepStatusItemViewModel> Steps { get; } = [];
 

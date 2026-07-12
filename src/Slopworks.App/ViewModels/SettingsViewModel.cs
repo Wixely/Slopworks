@@ -11,16 +11,25 @@ namespace Slopworks.App.ViewModels;
 /// Every knob that shapes the vLLM run, editable, with a live preview of the exact podman
 /// command the current values would produce. Nothing applies until Save.
 /// </summary>
-public partial class SettingsViewModel : ObservableObject
+public partial class SettingsViewModel : ObservableObject, IActivatableTab
 {
     private readonly SlopworksHost _host;
     private bool _loading;
+    private bool _profileProbed;
     private SystemProfile _profile = SystemProfile.Unknown;
 
     public SettingsViewModel(SlopworksHost host)
     {
         _host = host;
         LoadFromConfig();
+    }
+
+    /// <summary>Probes the machine profile (for the live command preview) the first time the tab is viewed.</summary>
+    public void Activate()
+    {
+        if (_profileProbed)
+            return;
+        _profileProbed = true;
         _ = InitProfileAsync();
     }
 

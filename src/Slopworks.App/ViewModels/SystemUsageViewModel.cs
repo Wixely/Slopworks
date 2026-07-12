@@ -32,9 +32,10 @@ public partial class GpuUsageItemViewModel(GpuUsage initial) : ObservableObject
 }
 
 /// <summary>Live whole-machine CPU/RAM bars plus per-GPU processing/VRAM bars, sampled once a second.</summary>
-public partial class SystemUsageViewModel : ObservableObject
+public partial class SystemUsageViewModel : ObservableObject, IActivatableTab
 {
     private readonly SlopworksHost _host;
+    private readonly DispatcherTimer _timer;
     private bool _gpuSampleInFlight;
 
     [ObservableProperty]
@@ -57,11 +58,18 @@ public partial class SystemUsageViewModel : ObservableObject
     public SystemUsageViewModel(SlopworksHost host)
     {
         _host = host;
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        timer.Tick += (_, _) => Refresh();
-        timer.Start();
-        Refresh(); // establishes the CPU baseline; real values from the next tick
+        _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _timer.Tick += (_, _) => Refresh();
     }
+
+    /// <summary>Only sample (incl. per-second nvidia-smi) while this tab is actually visible.</summary>
+    public void Activate()
+    {
+        Refresh(); // establishes the CPU baseline; real values from the next tick
+        _timer.Start();
+    }
+
+    public void Deactivate() => _timer.Stop();
 
     private void Refresh()
     {
