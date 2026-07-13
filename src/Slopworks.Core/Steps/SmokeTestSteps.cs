@@ -160,9 +160,9 @@ public sealed class VllmSmokeTestStep(VllmServerController server) : ISetupStep
         var hint = text switch
         {
             _ when text.Contains("UVA is not available", StringComparison.OrdinalIgnoreCase)
-                => "vLLM's GPU runner failed its UVA (Unified Virtual Addressing) check. Newer images tend to " +
-                   "fail this under WSL; try pinning an older vLLM image in Settings → GPU image " +
-                   "(e.g. docker.io/vllm/vllm-openai:v0.11.0) and re-run setup.",
+                => "vLLM force-disables pinned memory on WSL, so the V2 GPU runner fails. The fix is " +
+                   "VLLM_WSL2_ENABLE_PIN_MEMORY=1, which Slopworks now sets automatically — update Slopworks " +
+                   "and re-run setup (or add it under Settings → Extra container arguments).",
             _ when text.Contains("no kernel image is available", StringComparison.OrdinalIgnoreCase)
                 || text.Contains("sm_120", StringComparison.OrdinalIgnoreCase)
                 || text.Contains("kernel image", StringComparison.OrdinalIgnoreCase)

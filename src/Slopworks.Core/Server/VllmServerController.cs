@@ -59,9 +59,18 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
         }
 
         if (profile.GpuPresent)
+        {
             args.AddRange(["--device nvidia.com/gpu=all", "--ipc=host"]);
+
+            // vLLM force-disables pinned memory when it detects WSL, which makes the V2 GPU
+            // model runner fail with "UVA is not available". This is the sanctioned opt-in.
+            if (OperatingSystem.IsWindows())
+                args.Add("-e VLLM_WSL2_ENABLE_PIN_MEMORY=1");
+        }
         else
+        {
             args.Add("-e VLLM_CPU_KVCACHE_SPACE=8");
+        }
 
         args.AddRange(config.Server.ExtraContainerArgs);
         args.Add(image);

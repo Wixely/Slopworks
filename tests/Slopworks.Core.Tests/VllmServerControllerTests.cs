@@ -29,6 +29,18 @@ public class VllmServerControllerTests
     }
 
     [Fact]
+    public void GpuCommand_EnablesWslPinMemory_OnWindowsOnly()
+    {
+        var command = Build(new SlopworksConfig()).BuildRunCommand(GpuProfile, "org/model");
+
+        // On WSL (Windows) the V2 runner needs the pinned-memory opt-in; on a Linux host it doesn't.
+        if (OperatingSystem.IsWindows())
+            Assert.Contains("VLLM_WSL2_ENABLE_PIN_MEMORY=1", command);
+        else
+            Assert.DoesNotContain("VLLM_WSL2_ENABLE_PIN_MEMORY", command);
+    }
+
+    [Fact]
     public void CpuCommand_UsesCpuImageWithoutGpuFlags()
     {
         var config = new SlopworksConfig();
