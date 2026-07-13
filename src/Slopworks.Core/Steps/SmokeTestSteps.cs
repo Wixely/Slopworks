@@ -140,20 +140,67 @@ public sealed class VllmSmokeTestStep(VllmServerController server) : ISetupStep
 
     private async Task<string> DiagnoseStartupFailureAsync(ActionExecutionContext exec, CancellationToken ct)
     {
-        var logs = await server.GetLogsAsync(exec.Processes, 60, ct);
+        // Grab a generous window — the real cause prints well above the downstream
+        // "Engine core initialization failed" wrapper.
+        var logs = await server.GetLogsAsync(exec.Processes, 400, ct);
         var text = logs.Stdout;
+
+        // Persist the full log so the whole thing is readable later in the Logs tab.
+        string? savedName = null;
+        try
+        {
+            Directory.CreateDirectory(exec.Paths.VllmLogsDir);
+            savedName = "smoke-failure.log";
+            await File.WriteAllTextAsync(Path.Combine(exec.Paths.VllmLogsDir, savedName), text, ct);
+        }
+        catch (IOException)
+        {
+        }
 
         var hint = text switch
         {
+            _ when text.Contains("no kernel image is available", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("sm_120", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("kernel image", StringComparison.OrdinalIgnoreCase)
+                => "The GPU is newer than the vLLM image's built-in CUDA kernels (common on RTX 50-series / Blackwell). " +
+                   "Override Settings → GPU image with a newer or nightly build (CUDA 12.8+/Blackwell).",
             _ when text.Contains("401") || text.Contains("gated", StringComparison.OrdinalIgnoreCase)
                 => "The model looks gated — set a HuggingFace token in Settings.",
-            _ when text.Contains("out of memory", StringComparison.OrdinalIgnoreCase) || text.Contains("CUDA error")
+            _ when text.Contains("out of memory", StringComparison.OrdinalIgnoreCase)
                 => "GPU ran out of memory — pick a smaller model or lower gpu-memory-utilization.",
+            _ when text.Contains("CUDA error", StringComparison.OrdinalIgnoreCase)
+                => "A CUDA error occurred — usually a driver/image mismatch; try a newer GPU image in Settings.",
             _ when text.Contains("No space left", StringComparison.OrdinalIgnoreCase)
                 => "The distro disk is full — free space or move the Slopworks root to a bigger drive.",
-            _ => "See the server log tail below.",
+            _ when text.Contains("/dev/shm", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("shared memory", StringComparison.OrdinalIgnoreCase)
+                => "Shared memory looks too small for the engine — a WSL/container memory issue.",
+            _ => "See the extracted error below.",
         };
 
-        return $"vLLM did not become healthy. {hint}\n--- last log lines ---\n{DistroBaseStep.Tail(logs)}";
+        var where = savedName is null ? "" : $" Full log: Logs tab → vllm/{savedName}.";
+        return $"vLLM did not become healthy. {hint}{where}\n--- error excerpt ---\n{ExtractRootCause(text)}";
+    }
+
+    /// <summary>Return the log window starting at the earliest error signature (the real cause).</summary>
+    internal static string ExtractRootCause(string log, int window = 3000)
+    {
+        string[] markers =
+        [
+            "no kernel image is available", "CUDA error", "out of memory",
+            "Traceback (most recent call last)", "Error:", "Exception", "raise ",
+        ];
+
+        var indices = markers
+            .Select(m => log.IndexOf(m, StringComparison.OrdinalIgnoreCase))
+            .Where(i => i >= 0)
+            .ToList();
+
+        if (indices.Count == 0)
+            return log.Length <= window ? log.Trim() : "…" + log[^window..].Trim();
+
+        var start = Math.Max(0, indices.Min() - 200);
+        var slice = log[start..Math.Min(log.Length, start + window)];
+        return (start > 0 ? "…" : "") + slice.Trim();
     }
 }
