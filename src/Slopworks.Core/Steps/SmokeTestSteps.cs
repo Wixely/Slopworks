@@ -171,7 +171,9 @@ public sealed class VllmSmokeTestStep(VllmServerController server) : ISetupStep
             _ when text.Contains("401") || text.Contains("gated", StringComparison.OrdinalIgnoreCase)
                 => "The model looks gated — set a HuggingFace token in Settings.",
             _ when text.Contains("out of memory", StringComparison.OrdinalIgnoreCase)
-                => "GPU ran out of memory — pick a smaller model or lower gpu-memory-utilization.",
+                => "GPU ran out of memory. Lower GPU memory utilization in Settings (try 0.8), pick a smaller " +
+                   "model, or split across GPUs (tensor parallel). On Windows the display shares the GPU — leave " +
+                   "headroom, or set Visible GPU indices to a card that isn't driving your monitor.",
             _ when text.Contains("CUDA error", StringComparison.OrdinalIgnoreCase)
                 => "A CUDA error occurred — usually a driver/image mismatch; try a newer GPU image in Settings.",
             _ when text.Contains("No space left", StringComparison.OrdinalIgnoreCase)
