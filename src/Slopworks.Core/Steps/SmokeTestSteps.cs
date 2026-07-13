@@ -159,6 +159,10 @@ public sealed class VllmSmokeTestStep(VllmServerController server) : ISetupStep
 
         var hint = text switch
         {
+            _ when text.Contains("UVA is not available", StringComparison.OrdinalIgnoreCase)
+                => "This vLLM build's GPU runner requires UVA, which WSL2 does not provide, so the newest image " +
+                   "cannot run under WSL. Pin an OLDER vLLM image in Settings → GPU image (e.g. " +
+                   "docker.io/vllm/vllm-openai:v0.11.0) and re-run setup.",
             _ when text.Contains("no kernel image is available", StringComparison.OrdinalIgnoreCase)
                 || text.Contains("sm_120", StringComparison.OrdinalIgnoreCase)
                 || text.Contains("kernel image", StringComparison.OrdinalIgnoreCase)
