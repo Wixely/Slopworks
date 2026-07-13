@@ -37,6 +37,8 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     [ObservableProperty] private string _port = "";
     [ObservableProperty] private string _model = "";
     [ObservableProperty] private string _gpuMemoryUtilization = "";
+    [ObservableProperty] private string _tensorParallelSize = "";
+    [ObservableProperty] private string _visibleGpus = "";
     [ObservableProperty] private string _hfToken = "";
     [ObservableProperty] private string _extraVllmArgs = "";
     [ObservableProperty] private string _extraContainerArgs = "";
@@ -89,6 +91,8 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         Port = config.Server.Port.ToString();
         Model = config.Server.Model;
         GpuMemoryUtilization = config.Server.GpuMemoryUtilization.ToString("0.##");
+        TensorParallelSize = config.Server.TensorParallelSize.ToString();
+        VisibleGpus = config.Server.VisibleGpus ?? "";
         HfToken = config.Server.HfToken ?? "";
         ExtraVllmArgs = string.Join(Environment.NewLine, config.Server.ExtraArgs);
         ExtraContainerArgs = string.Join(Environment.NewLine, config.Server.ExtraContainerArgs);
@@ -123,6 +127,8 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         config.Server.Port = port;
         config.Server.Model = Model.Trim();
         config.Server.GpuMemoryUtilization = gpuMem;
+        config.Server.TensorParallelSize = int.TryParse(TensorParallelSize, out var tp) && tp > 0 ? tp : 1;
+        config.Server.VisibleGpus = string.IsNullOrWhiteSpace(VisibleGpus) ? null : VisibleGpus.Trim();
         config.Server.HfToken = string.IsNullOrWhiteSpace(HfToken) ? null : HfToken.Trim();
         config.Server.ExtraArgs = SplitArgs(ExtraVllmArgs);
         config.Server.ExtraContainerArgs = SplitArgs(ExtraContainerArgs);
@@ -169,6 +175,8 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
                 Port = port,
                 Model = Model.Trim(),
                 GpuMemoryUtilization = gpuMem,
+                TensorParallelSize = int.TryParse(TensorParallelSize, out var tp) && tp > 0 ? tp : 1,
+                VisibleGpus = string.IsNullOrWhiteSpace(VisibleGpus) ? null : VisibleGpus.Trim(),
                 HfToken = string.IsNullOrWhiteSpace(HfToken) ? null : "***",
                 ExtraArgs = SplitArgs(ExtraVllmArgs),
                 ExtraContainerArgs = SplitArgs(ExtraContainerArgs),

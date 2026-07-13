@@ -41,6 +41,28 @@ public class VllmServerControllerTests
     }
 
     [Fact]
+    public void TensorParallelAndVisibleGpus_ComposeIntoTheCommand()
+    {
+        var config = new SlopworksConfig();
+        config.Server.TensorParallelSize = 2;
+        config.Server.VisibleGpus = "1,2";
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains("-e CUDA_VISIBLE_DEVICES=1,2", command);
+        Assert.Contains("--tensor-parallel-size 2", command);
+    }
+
+    [Fact]
+    public void SingleGpuDefaults_OmitTensorParallelAndDeviceFlags()
+    {
+        var command = Build(new SlopworksConfig()).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.DoesNotContain("--tensor-parallel-size", command);
+        Assert.DoesNotContain("CUDA_VISIBLE_DEVICES", command);
+    }
+
+    [Fact]
     public void CpuCommand_UsesCpuImageWithoutGpuFlags()
     {
         var config = new SlopworksConfig();

@@ -66,6 +66,10 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
             // model runner fail with "UVA is not available". This is the sanctioned opt-in.
             if (OperatingSystem.IsWindows())
                 args.Add("-e VLLM_WSL2_ENABLE_PIN_MEMORY=1");
+
+            // Restrict which GPUs vLLM sees (all are exposed to the container via CDI).
+            if (config.Server.VisibleGpus is { Length: > 0 } gpus)
+                args.Add($"-e CUDA_VISIBLE_DEVICES={gpus}");
         }
         else
         {
@@ -76,7 +80,11 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
         args.Add(image);
         args.Add($"--model {model}");
         if (profile.GpuPresent)
+        {
             args.Add($"--gpu-memory-utilization {config.Server.GpuMemoryUtilization:0.##}");
+            if (config.Server.TensorParallelSize > 1)
+                args.Add($"--tensor-parallel-size {config.Server.TensorParallelSize}");
+        }
         args.AddRange(config.Server.ExtraArgs);
 
         return string.Join(" ", args);

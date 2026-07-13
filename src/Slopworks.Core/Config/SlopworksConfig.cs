@@ -64,6 +64,19 @@ public sealed class ServerConfig
     public List<string> ExtraContainerArgs { get; set; } = [];
     public string? HfToken { get; set; }
     public double GpuMemoryUtilization { get; set; } = 0.90;
+
+    /// <summary>
+    /// Split the model across this many GPUs (vLLM --tensor-parallel-size). 1 = single GPU.
+    /// Must divide the model's attention-head count, and the cards should match (same arch
+    /// and memory) — mixed GPUs are unreliable.
+    /// </summary>
+    public int TensorParallelSize { get; set; } = 1;
+
+    /// <summary>
+    /// Which GPUs vLLM may use, as CUDA_VISIBLE_DEVICES (e.g. "0" or "1,2"). Blank = all.
+    /// Use this to pick a specific card or restrict tensor parallelism to matching GPUs.
+    /// </summary>
+    public string? VisibleGpus { get; set; }
 }
 
 public sealed class ImagesConfig

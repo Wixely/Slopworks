@@ -22,23 +22,31 @@
 
         <StackPanel Spacing="8">
           <TextBlock Text="vLLM server" FontWeight="SemiBold" FontSize="16" />
-          <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" >
+          <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" >
             <TextBlock Grid.Row="0" Text="Port" VerticalAlignment="Center" />
             <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Port}" Margin="0,2" />
             <TextBlock Grid.Row="1" Text="Model (HuggingFace id)" VerticalAlignment="Center" />
             <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Model}" Margin="0,2" />
             <TextBlock Grid.Row="2" Text="GPU memory utilization" VerticalAlignment="Center" />
             <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding GpuMemoryUtilization}" Margin="0,2" />
-            <TextBlock Grid.Row="3" Text="HuggingFace token" VerticalAlignment="Center" />
-            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding HfToken}" PasswordChar="•" Margin="0,2" />
-            <TextBlock Grid.Row="4" Text="Extra vLLM arguments" VerticalAlignment="Top" Margin="0,6,0,0"
+            <TextBlock Grid.Row="3" Text="GPUs (tensor parallel)" VerticalAlignment="Center"
+                       ToolTip.Tip="Split the model across this many GPUs. 1 = single GPU. Must divide the model's head count; use matching cards (same arch/memory)." />
+            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding TensorParallelSize}" Margin="0,2"
+                     PlaceholderText="1" />
+            <TextBlock Grid.Row="4" Text="Visible GPU indices" VerticalAlignment="Center"
+                       ToolTip.Tip="CUDA_VISIBLE_DEVICES — which cards vLLM may use, e.g. 0 or 1,2. Blank = all. Pair with tensor parallel to restrict to matching GPUs." />
+            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding VisibleGpus}" Margin="0,2"
+                     PlaceholderText="blank = all, or e.g. 1,2" />
+            <TextBlock Grid.Row="5" Text="HuggingFace token" VerticalAlignment="Center" />
+            <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding HfToken}" PasswordChar="•" Margin="0,2" />
+            <TextBlock Grid.Row="6" Text="Extra vLLM arguments" VerticalAlignment="Top" Margin="0,6,0,0"
                        ToolTip.Tip="Appended after --model. One argument per line, e.g. --max-model-len 8192" />
-            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding ExtraVllmArgs}" AcceptsReturn="True"
+            <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding ExtraVllmArgs}" AcceptsReturn="True"
                      MinHeight="56" FontFamily="Consolas,Menlo,monospace" FontSize="12" Margin="0,2"
                      PlaceholderText="--max-model-len 8192&#x0a;--dtype float16" />
-            <TextBlock Grid.Row="5" Text="Extra container arguments" VerticalAlignment="Top" Margin="0,6,0,0"
+            <TextBlock Grid.Row="7" Text="Extra container arguments" VerticalAlignment="Top" Margin="0,6,0,0"
                        ToolTip.Tip="Podman flags inserted before the image. One per line, e.g. --memory 24g" />
-            <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding ExtraContainerArgs}" AcceptsReturn="True"
+            <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding ExtraContainerArgs}" AcceptsReturn="True"
                      MinHeight="56" FontFamily="Consolas,Menlo,monospace" FontSize="12" Margin="0,2"
                      PlaceholderText="--memory 24g" />
           </Grid>
