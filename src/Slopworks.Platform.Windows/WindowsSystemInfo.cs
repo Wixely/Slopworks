@@ -27,6 +27,9 @@ public sealed class WindowsSystemInfo(SlopworksPaths paths, IProcessRunner probe
         };
     }
 
+    public async Task<IReadOnlyList<GpuDevice>> EnumerateGpusAsync(CancellationToken ct)
+        => await NvidiaSmiInventory.EnumerateAsync(probes, "nvidia-smi.exe", ct);
+
     /// <summary>
     /// Driver-independent hardware check: pnputil enumerates PCI display devices with their
     /// vendor ids even when Windows only has a basic display driver for them.

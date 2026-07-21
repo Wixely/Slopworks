@@ -36,6 +36,9 @@ public sealed class LinuxSystemInfo(SlopworksPaths paths, IProcessRunner probes)
         }
     }
 
+    public async Task<IReadOnlyList<GpuDevice>> EnumerateGpusAsync(CancellationToken ct)
+        => await NvidiaSmiInventory.EnumerateAsync(probes, "nvidia-smi", ct);
+
     private async Task<GpuInfo?> DetectGpuAsync(CancellationToken ct)
     {
         try

@@ -1,11 +1,35 @@
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Slopworks.Core.Config;
 using Slopworks.Core.Engine;
+using Slopworks.Core.Platform;
 using Slopworks.Core.Server;
 
 namespace Slopworks.App.ViewModels;
+
+/// <summary>One GPU checkbox in the Settings visible-GPUs list.</summary>
+public partial class GpuCheckItemViewModel : ObservableObject
+{
+    private readonly Action _onChanged;
+
+    public GpuCheckItemViewModel(int index, string label, bool selected, Action onChanged)
+    {
+        Index = index;
+        Label = label;
+        _isSelected = selected;
+        _onChanged = onChanged;
+    }
+
+    public int Index { get; }
+    public string Label { get; }
+
+    [ObservableProperty]
+    private bool _isSelected;
+
+    partial void OnIsSelectedChanged(bool value) => _onChanged();
+}
 
 /// <summary>
 /// Every knob that shapes the vLLM run, editable, with a live preview of the exact podman
@@ -37,11 +61,20 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     [ObservableProperty] private string _port = "";
     [ObservableProperty] private string _model = "";
     [ObservableProperty] private string _gpuMemoryUtilization = "";
-    [ObservableProperty] private string _tensorParallelSize = "";
-    [ObservableProperty] private string _visibleGpus = "";
     [ObservableProperty] private string _hfToken = "";
     [ObservableProperty] private string _extraVllmArgs = "";
     [ObservableProperty] private string _extraContainerArgs = "";
+
+    // GPUs (populated from nvidia-smi when the tab is first viewed)
+    public ObservableCollection<GpuCheckItemViewModel> Gpus { get; } = [];
+    public ObservableCollection<int> TensorParallelOptions { get; } = [1];
+    public IReadOnlyList<string> DeviceOrderOptions { get; } =
+        ["Fastest first (CUDA default)", "PCI bus order (recommended for mixed GPUs)"];
+
+    [ObservableProperty] private int _selectedTensorParallel = 1;
+    [ObservableProperty] private int _selectedDeviceOrderIndex;
+    [ObservableProperty] private bool _hasGpus;
+    [ObservableProperty] private string _gpuHint = "Viewing this tab lists your GPUs.";
 
     // Images
     [ObservableProperty] private string _gpuImage = "";
@@ -71,17 +104,76 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
 
     private async Task InitProfileAsync()
     {
+        IReadOnlyList<GpuDevice> gpus = [];
         try
         {
             _profile = await _host.SystemInfo.GetProfileAsync(CancellationToken.None);
+            gpus = await _host.SystemInfo.EnumerateGpusAsync(CancellationToken.None);
         }
         catch (Exception)
         {
             // Preview falls back to CPU shape; settings editing must never be blocked by probes.
         }
 
+        BuildGpuControls(gpus);
+    }
+
+    /// <summary>Builds the GPU checkboxes and tensor-parallel options from the enumerated devices.</summary>
+    private void BuildGpuControls(IReadOnlyList<GpuDevice> gpus)
+    {
+        _loading = true;
+
+        var chosen = ParseVisibleGpus(_host.Config.Server.VisibleGpus, gpus);
+        Gpus.Clear();
+        foreach (var gpu in gpus)
+            Gpus.Add(new GpuCheckItemViewModel(gpu.Index, gpu.Describe(), chosen.Contains(gpu.Index), OnGpuSelectionChanged));
+
+        var maxParallel = Math.Max(1, gpus.Count);
+        TensorParallelOptions.Clear();
+        for (var n = 1; n <= maxParallel; n++)
+            TensorParallelOptions.Add(n);
+        SelectedTensorParallel = Math.Clamp(_host.Config.Server.TensorParallelSize, 1, maxParallel);
+
+        SelectedDeviceOrderIndex =
+            string.Equals(_host.Config.Server.CudaDeviceOrder, "PCI_BUS_ID", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+
+        HasGpus = gpus.Count > 0;
+        GpuHint = gpus.Count > 0
+            ? "Unchecked GPUs are hidden from vLLM (CUDA_VISIBLE_DEVICES). All checked = use all."
+            : "No NVIDIA GPUs detected (nvidia-smi unavailable). GPU options are hidden — this is normal in CPU mode.";
+
+        _loading = false;
         UpdatePreview();
     }
+
+    private void OnGpuSelectionChanged()
+    {
+        if (!_loading)
+            UpdatePreview();
+    }
+
+    private static HashSet<int> ParseVisibleGpus(string? configured, IReadOnlyList<GpuDevice> gpus)
+    {
+        // Blank = all GPUs selected.
+        if (string.IsNullOrWhiteSpace(configured))
+            return [.. gpus.Select(g => g.Index)];
+
+        return [.. configured.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => int.TryParse(s, out var i) ? i : -1)
+            .Where(i => i >= 0)];
+    }
+
+    private string? ComposeVisibleGpus()
+    {
+        if (Gpus.Count == 0)
+            return _host.Config.Server.VisibleGpus; // no list available; keep whatever was configured
+
+        var selected = Gpus.Where(g => g.IsSelected).Select(g => g.Index).ToList();
+        // All (or none) selected means "use all" — represented as blank.
+        return selected.Count == 0 || selected.Count == Gpus.Count ? null : string.Join(",", selected);
+    }
+
+    private string? ComposeDeviceOrder() => SelectedDeviceOrderIndex == 1 ? "PCI_BUS_ID" : null;
 
     private void LoadFromConfig()
     {
@@ -91,8 +183,6 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         Port = config.Server.Port.ToString();
         Model = config.Server.Model;
         GpuMemoryUtilization = config.Server.GpuMemoryUtilization.ToString("0.##");
-        TensorParallelSize = config.Server.TensorParallelSize.ToString();
-        VisibleGpus = config.Server.VisibleGpus ?? "";
         HfToken = config.Server.HfToken ?? "";
         ExtraVllmArgs = string.Join(Environment.NewLine, config.Server.ExtraArgs);
         ExtraContainerArgs = string.Join(Environment.NewLine, config.Server.ExtraContainerArgs);
@@ -109,6 +199,17 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         Proxy = config.Network.Proxy ?? "";
         AllowSystemProxy = config.Network.AllowSystemProxy;
         AutoApproveInsideRoot = config.AutoApproveInsideRoot;
+
+        // Re-apply GPU selections when the list already exists (e.g. Discard changes).
+        if (Gpus.Count > 0)
+        {
+            var chosen = ParseVisibleGpus(config.Server.VisibleGpus, [.. Gpus.Select(g => new GpuDevice(g.Index, "", "", 0))]);
+            foreach (var gpu in Gpus)
+                gpu.IsSelected = chosen.Contains(gpu.Index);
+            SelectedTensorParallel = Math.Clamp(config.Server.TensorParallelSize, 1, Math.Max(1, TensorParallelOptions.Count));
+            SelectedDeviceOrderIndex =
+                string.Equals(config.Server.CudaDeviceOrder, "PCI_BUS_ID", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        }
 
         _loading = false;
         UpdatePreview();
@@ -127,8 +228,9 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         config.Server.Port = port;
         config.Server.Model = Model.Trim();
         config.Server.GpuMemoryUtilization = gpuMem;
-        config.Server.TensorParallelSize = int.TryParse(TensorParallelSize, out var tp) && tp > 0 ? tp : 1;
-        config.Server.VisibleGpus = string.IsNullOrWhiteSpace(VisibleGpus) ? null : VisibleGpus.Trim();
+        config.Server.TensorParallelSize = SelectedTensorParallel > 0 ? SelectedTensorParallel : 1;
+        config.Server.VisibleGpus = ComposeVisibleGpus();
+        config.Server.CudaDeviceOrder = ComposeDeviceOrder();
         config.Server.HfToken = string.IsNullOrWhiteSpace(HfToken) ? null : HfToken.Trim();
         config.Server.ExtraArgs = SplitArgs(ExtraVllmArgs);
         config.Server.ExtraContainerArgs = SplitArgs(ExtraContainerArgs);
@@ -175,8 +277,9 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
                 Port = port,
                 Model = Model.Trim(),
                 GpuMemoryUtilization = gpuMem,
-                TensorParallelSize = int.TryParse(TensorParallelSize, out var tp) && tp > 0 ? tp : 1,
-                VisibleGpus = string.IsNullOrWhiteSpace(VisibleGpus) ? null : VisibleGpus.Trim(),
+                TensorParallelSize = SelectedTensorParallel > 0 ? SelectedTensorParallel : 1,
+                VisibleGpus = ComposeVisibleGpus(),
+                CudaDeviceOrder = ComposeDeviceOrder(),
                 HfToken = string.IsNullOrWhiteSpace(HfToken) ? null : "***",
                 ExtraArgs = SplitArgs(ExtraVllmArgs),
                 ExtraContainerArgs = SplitArgs(ExtraContainerArgs),

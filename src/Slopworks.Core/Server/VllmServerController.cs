@@ -67,6 +67,11 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
             if (OperatingSystem.IsWindows())
                 args.Add("-e VLLM_WSL2_ENABLE_PIN_MEMORY=1");
 
+            // Make CUDA index by PCI bus order (or the chosen order) so indices are stable
+            // and match nvidia-smi — silences the mixed-GPU ordering warning.
+            if (config.Server.CudaDeviceOrder is { Length: > 0 } order)
+                args.Add($"-e CUDA_DEVICE_ORDER={order}");
+
             // Restrict which GPUs vLLM sees (all are exposed to the container via CDI).
             if (config.Server.VisibleGpus is { Length: > 0 } gpus)
                 args.Add($"-e CUDA_VISIBLE_DEVICES={gpus}");

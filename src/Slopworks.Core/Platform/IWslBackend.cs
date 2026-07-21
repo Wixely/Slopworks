@@ -38,4 +38,10 @@ public interface IWslBackend
 public interface ISystemInfoProvider
 {
     Task<SystemProfile> GetProfileAsync(CancellationToken ct);
+
+    /// <summary>
+    /// All GPUs with index/name/PCI-bus-id for the Settings selectors. Empty when nvidia-smi
+    /// is unavailable; degrades to name-only (no PCI) if the driver is too old to report it.
+    /// </summary>
+    Task<IReadOnlyList<GpuDevice>> EnumerateGpusAsync(CancellationToken ct);
 }

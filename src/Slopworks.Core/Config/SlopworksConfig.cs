@@ -77,6 +77,13 @@ public sealed class ServerConfig
     /// Use this to pick a specific card or restrict tensor parallelism to matching GPUs.
     /// </summary>
     public string? VisibleGpus { get; set; }
+
+    /// <summary>
+    /// CUDA_DEVICE_ORDER: "PCI_BUS_ID" makes CUDA indices follow PCI bus order (stable, and
+    /// what nvidia-smi shows); "FASTEST_FIRST" is CUDA's default. Blank = leave unset.
+    /// Recommended PCI_BUS_ID on mixed-GPU machines so device indices are unambiguous.
+    /// </summary>
+    public string? CudaDeviceOrder { get; set; }
 }
 
 public sealed class ImagesConfig
