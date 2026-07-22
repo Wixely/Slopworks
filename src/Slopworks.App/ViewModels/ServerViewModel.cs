@@ -1,9 +1,12 @@
 using System.Collections.ObjectModel;
+using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Slopworks.Core;
 using Slopworks.Core.Config;
 using Slopworks.Core.Logging;
+using Slopworks.Core.Server;
 using Slopworks.Platform.Abstractions;
 
 namespace Slopworks.App.ViewModels;
@@ -51,9 +54,69 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
     public string AgentHint =>
         $"Point your agent's base_url at one of these. Model id: '{Model}'. Any API key is accepted (no auth).";
 
+    /// <summary>A caution shown under the model box when the id looks Ollama/GGUF-shaped.</summary>
+    public string? ModelAdvisory => ModelId.Advisory(Model);
+    public bool HasModelAdvisory => ModelAdvisory is not null;
+
     private bool _applyingExposure;
 
-    partial void OnModelChanged(string value) => OnPropertyChanged(nameof(AgentHint));
+    partial void OnModelChanged(string value)
+    {
+        OnPropertyChanged(nameof(AgentHint));
+        OnPropertyChanged(nameof(ModelAdvisory));
+        OnPropertyChanged(nameof(HasModelAdvisory));
+        // The previous check result is about a different id now.
+        HasModelCheck = false;
+        ModelCheckText = "";
+    }
+
+    // Result of the "Check" button — does HuggingFace show a repo vLLM can actually serve?
+    [ObservableProperty]
+    private string _modelCheckText = "";
+
+    [ObservableProperty]
+    private bool _hasModelCheck;
+
+    [ObservableProperty]
+    private IBrush _modelCheckBrush = Brushes.Gray;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CheckModelCommand))]
+    private bool _isCheckingModel;
+
+    private bool CanCheckModel => !IsCheckingModel;
+
+    [RelayCommand(CanExecute = nameof(CanCheckModel))]
+    private async Task CheckModelAsync()
+    {
+        IsCheckingModel = true;
+        HasModelCheck = true;
+        ModelCheckBrush = Brushes.Gray;
+        ModelCheckText = $"Checking {Model.Trim()} on HuggingFace…";
+        try
+        {
+            var result = await host.ModelInspector.InspectAsync(Model, CancellationToken.None);
+            ModelCheckText = $"{result.Summary} — {result.Detail}";
+            ModelCheckBrush = BrushFor(result.Verdict);
+        }
+        catch (Exception ex)
+        {
+            ModelCheckText = $"Check failed: {ex.Message}";
+            ModelCheckBrush = Brushes.Gray;
+        }
+        finally
+        {
+            IsCheckingModel = false;
+        }
+    }
+
+    private static IBrush BrushFor(ModelVerdict verdict) => verdict switch
+    {
+        ModelVerdict.Servable => new SolidColorBrush(Color.Parse("#3FB950")),   // green
+        ModelVerdict.Caution => new SolidColorBrush(Color.Parse("#E0A030")),    // amber
+        ModelVerdict.Unservable => new SolidColorBrush(Color.Parse("#F0603E")), // red
+        _ => new SolidColorBrush(Color.Parse("#9AA0A6")),                        // gray
+    };
 
     private IProcessRunner Runner => new RecordingProcessRunner(
         host.ProcessRunner, host.CommandLog, "server-ui", "user-click");

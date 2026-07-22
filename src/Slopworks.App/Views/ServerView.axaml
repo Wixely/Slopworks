@@ -12,11 +12,19 @@
 
     <Grid Grid.Row="1" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,0,0,10">
       <TextBlock Grid.Row="0" Grid.Column="0" Text="Model (HuggingFace id)" VerticalAlignment="Center" Margin="0,0,10,6" />
-      <DockPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,6">
-        <Button DockPanel.Dock="Right" Content="Copy" Click="CopyModel_Click" Margin="8,0,0,0"
-                ToolTip.Tip="Copy the model id — agents must pass this exact value as their model parameter" />
-        <TextBox Text="{Binding Model}" PlaceholderText="Qwen/Qwen2.5-0.5B-Instruct" />
-      </DockPanel>
+      <StackPanel Grid.Row="0" Grid.Column="1" Spacing="2" Margin="0,0,0,6">
+        <DockPanel>
+          <Button DockPanel.Dock="Right" Content="Copy" Click="CopyModel_Click" Margin="8,0,0,0"
+                  ToolTip.Tip="Copy the model id — agents must pass this exact value as their model parameter" />
+          <Button DockPanel.Dock="Right" Content="Check" Command="{Binding CheckModelCommand}" Margin="8,0,0,0"
+                  ToolTip.Tip="Ask HuggingFace whether vLLM can serve this repo (safetensors + a supported quant) — catches GGUF/MLX/private repos before you download." />
+          <TextBox Text="{Binding Model}" PlaceholderText="Qwen/Qwen2.5-0.5B-Instruct" />
+        </DockPanel>
+        <TextBlock Text="{Binding ModelAdvisory}" IsVisible="{Binding HasModelAdvisory}"
+                   Foreground="#E0A030" FontSize="12" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding ModelCheckText}" IsVisible="{Binding HasModelCheck}"
+                   Foreground="{Binding ModelCheckBrush}" FontSize="12" TextWrapping="Wrap" />
+      </StackPanel>
       <TextBlock Grid.Row="1" Grid.Column="0" Text="HuggingFace token" VerticalAlignment="Center" Margin="0,0,10,0" />
       <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding HfToken}" PasswordChar="•" PlaceholderText="only needed for gated models" />
     </Grid>

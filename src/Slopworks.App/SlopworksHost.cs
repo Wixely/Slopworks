@@ -38,6 +38,7 @@ public sealed class SlopworksHost
     public required IShellIntegration ShellIntegration { get; init; }
     public required ILinuxCommandFactory Linux { get; init; }
     public required VllmServerController Server { get; init; }
+    public required ModelInspector ModelInspector { get; init; }
     public required INetworkExposure NetworkExposure { get; init; }
     public required ISystemMetrics Metrics { get; init; }
     public required IGpuMetrics GpuMetrics { get; init; }
@@ -79,6 +80,7 @@ public sealed class SlopworksHost
                 ShellIntegration = new WindowsShellIntegration(runner),
                 Linux = linux,
                 Server = new VllmServerController(linux, config, http, paths),
+                ModelInspector = new ModelInspector(http, config),
                 NetworkExposure = new WindowsNetworkExposure(),
                 Metrics = new WindowsSystemMetrics(),
                 GpuMetrics = new WindowsGpuMetrics(),
@@ -105,6 +107,7 @@ public sealed class SlopworksHost
                 ShellIntegration = new LinuxShellIntegration(runner),
                 Linux = linux,
                 Server = new VllmServerController(linux, config, http, paths),
+                ModelInspector = new ModelInspector(http, config),
                 NetworkExposure = new LinuxNetworkExposure(),
                 Metrics = new LinuxSystemMetrics(),
                 GpuMetrics = new LinuxGpuMetrics(),

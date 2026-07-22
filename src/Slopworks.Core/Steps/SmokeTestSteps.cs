@@ -174,6 +174,14 @@ public sealed class VllmSmokeTestStep(VllmServerController server) : ISetupStep
                 || text.Contains("kernel image", StringComparison.OrdinalIgnoreCase)
                 => "The GPU is newer than the vLLM image's built-in CUDA kernels (common on RTX 50-series / Blackwell). " +
                    "Override Settings → GPU image with a newer or nightly build (CUDA 12.8+/Blackwell).",
+            _ when text.Contains("Repo id must be in the form", StringComparison.OrdinalIgnoreCase)
+                => "The model id has an Ollama-style 'hf.co/' prefix that HuggingFace rejects. Use a bare " +
+                   "'namespace/model' id (Slopworks now strips the prefix automatically — update and re-run).",
+            _ when text.Contains("Invalid repository ID or local directory", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("ensure the presence of a 'config.json'", StringComparison.OrdinalIgnoreCase)
+                => "That repo has no config.json — it's GGUF-only (a llama.cpp/Ollama format) or doesn't exist. " +
+                   "vLLM needs a safetensors checkpoint: use the model's AWQ / GPTQ / FP8 (or bnb-4bit) repo, " +
+                   "not the -GGUF one. For GGUF files, use Ollama instead.",
             _ when text.Contains("401") || text.Contains("gated", StringComparison.OrdinalIgnoreCase)
                 => "The model looks gated — set a HuggingFace token in Settings.",
             _ when text.Contains("out of memory", StringComparison.OrdinalIgnoreCase)

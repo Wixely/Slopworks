@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Slopworks.Core;
 using Slopworks.Core.Config;
 using Slopworks.Core.Engine;
 using Slopworks.Core.Platform;
@@ -69,6 +70,16 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     [ObservableProperty] private string _extraVllmArgs = "";
     [ObservableProperty] private string _extraContainerArgs = "";
 
+    /// <summary>A caution shown under the model field when the id looks Ollama/GGUF-shaped.</summary>
+    public string? ModelAdvisory => ModelId.Advisory(Model);
+    public bool HasModelAdvisory => ModelAdvisory is not null;
+
+    partial void OnModelChanged(string value)
+    {
+        OnPropertyChanged(nameof(ModelAdvisory));
+        OnPropertyChanged(nameof(HasModelAdvisory));
+    }
+
     public IReadOnlyList<string> LogLevelOptions { get; } = ["DEBUG", "INFO", "WARNING", "ERROR"];
 
     public IReadOnlyList<string> QuantizationOptions { get; } =
@@ -109,7 +120,8 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     protected override void OnPropertyChanged(PropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
-        if (!_loading && e.PropertyName is not (nameof(CommandPreview) or nameof(PreviewLabel) or nameof(StatusText)))
+        if (!_loading && e.PropertyName is not (nameof(CommandPreview) or nameof(PreviewLabel) or nameof(StatusText)
+                or nameof(ModelAdvisory) or nameof(HasModelAdvisory)))
             UpdatePreview();
     }
 

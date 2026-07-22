@@ -274,6 +274,33 @@ public class VllmServerControllerTests
         Assert.Contains("-e VLLM_LOGGING_LEVEL=DEBUG", command);
     }
 
+    [Theory]
+    [InlineData("hf.co/unsloth/Qwen3-32B-AWQ", "unsloth/Qwen3-32B-AWQ")]
+    [InlineData("https://huggingface.co/org/model", "org/model")]
+    [InlineData("  org/model  ", "org/model")]
+    [InlineData("org/model", "org/model")]
+    public void ModelId_Normalize_StripsHostPrefixes(string input, string expected)
+        => Assert.Equal(expected, ModelId.Normalize(input));
+
+    [Fact]
+    public void BuildRunCommand_NormalizesPastedHfCoPrefix()
+    {
+        var command = Build(new SlopworksConfig()).BuildRunCommand(GpuProfile, "hf.co/org/model");
+
+        Assert.Contains("--model org/model", command);
+        Assert.DoesNotContain("hf.co/", command);
+    }
+
+    [Theory]
+    [InlineData("org/model", false)]
+    [InlineData("org/model-AWQ", false)]
+    [InlineData("unsloth/Qwen3-27B-GGUF", true)]        // GGUF-only repo
+    [InlineData("org/model:q4", true)]                  // Ollama tag
+    [InlineData("hf.co/org/model-GGUF", true)]          // prefix stripped, still GGUF
+    [InlineData("mlx-community/Qwen3-27B-8bit", true)]  // MLX / Apple Silicon
+    public void ModelId_Advisory_FlagsOllamaAndGguf(string input, bool expectWarning)
+        => Assert.Equal(expectWarning, ModelId.Advisory(input) is not null);
+
     [Fact]
     public void HfToken_NeverAppearsInTheCommandLine()
     {

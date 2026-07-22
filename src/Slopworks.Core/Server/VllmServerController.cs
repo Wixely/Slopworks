@@ -31,6 +31,10 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
     /// <summary>The full podman command — also shown verbatim on confirmation cards.</summary>
     public string BuildRunCommand(SystemProfile profile, string model)
     {
+        // People paste ids straight from Ollama ("hf.co/org/repo") or the HF page; vLLM's
+        // HuggingFace validation rejects the host prefix. Strip it so the id actually loads.
+        model = ModelId.Normalize(model);
+
         var image = SelectImage(profile);
 
         // Windows: WSL NAT already confines reachability (host exposure is the portproxy's

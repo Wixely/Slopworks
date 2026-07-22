@@ -26,7 +26,12 @@
             <TextBlock Grid.Row="0" Text="Port" VerticalAlignment="Center" />
             <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Port}" Margin="0,2" />
             <TextBlock Grid.Row="1" Text="Model (HuggingFace id)" VerticalAlignment="Center" />
-            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Model}" Margin="0,2" />
+            <StackPanel Grid.Row="1" Grid.Column="1" Spacing="2">
+              <TextBox Text="{Binding Model}" Margin="0,2"
+                       ToolTip.Tip="A HuggingFace repo id like org/model or org/model-AWQ. Not an Ollama 'hf.co/…:tag' string, and not a GGUF-only repo — vLLM needs safetensors + config.json." />
+              <TextBlock Text="{Binding ModelAdvisory}" IsVisible="{Binding HasModelAdvisory}"
+                         Foreground="#E0A030" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
             <TextBlock Grid.Row="2" Text="GPU memory utilization" VerticalAlignment="Center"
                        ToolTip.Tip="Fraction of each GPU vLLM reserves. Lower it (e.g. 0.8) if the GPU also drives your display." />
             <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding GpuMemoryUtilization}" Margin="0,2" />

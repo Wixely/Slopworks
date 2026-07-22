@@ -66,6 +66,12 @@ public sealed class ServerConfig
     public double GpuMemoryUtilization { get; set; } = 0.90;
 
     /// <summary>
+    /// HuggingFace host the model checker queries for repo metadata (files, tags, config.json).
+    /// Overridable for a mirror/proxy; the container still downloads weights via its own HF settings.
+    /// </summary>
+    public string HuggingFaceEndpoint { get; set; } = "https://huggingface.co";
+
+    /// <summary>
     /// vLLM logging level (VLLM_LOGGING_LEVEL): DEBUG (most verbose — shows request detail,
     /// useful for diagnosing 400s), INFO (default), WARNING, ERROR.
     /// </summary>
