@@ -73,8 +73,10 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
 
     [ObservableProperty] private int _selectedTensorParallel = 1;
     [ObservableProperty] private int _selectedDeviceOrderIndex;
+    [ObservableProperty] private bool _disableGpuP2P;
     [ObservableProperty] private bool _hasGpus;
     [ObservableProperty] private string _gpuHint = "Viewing this tab lists your GPUs.";
+    [ObservableProperty] private string _nvLinkHint = "";
 
     // Images
     [ObservableProperty] private string _gpuImage = "";
@@ -136,6 +138,13 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
 
         SelectedDeviceOrderIndex =
             string.Equals(_host.Config.Server.CudaDeviceOrder, "PCI_BUS_ID", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+
+        // Auto default: disable P2P only when there's no NVLink to use.
+        DisableGpuP2P = _host.Config.Server.DisableGpuP2P ?? !_profile.HasNvLink;
+        NvLinkHint = _profile.HasNvLink
+            ? "NVLink detected — leave this unchecked to use it (much faster). Only check it if multi-GPU " +
+              "still errors with 'invalid resource handle'."
+            : "No NVLink detected — keep this checked (WSL doesn't support PCIe peer-to-peer across GPUs).";
 
         HasGpus = gpus.Count > 0;
         GpuHint = gpus.Count > 0
@@ -209,6 +218,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
             SelectedTensorParallel = Math.Clamp(config.Server.TensorParallelSize, 1, Math.Max(1, TensorParallelOptions.Count));
             SelectedDeviceOrderIndex =
                 string.Equals(config.Server.CudaDeviceOrder, "PCI_BUS_ID", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+            DisableGpuP2P = config.Server.DisableGpuP2P ?? !_profile.HasNvLink;
         }
 
         _loading = false;
@@ -231,6 +241,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         config.Server.TensorParallelSize = SelectedTensorParallel > 0 ? SelectedTensorParallel : 1;
         config.Server.VisibleGpus = ComposeVisibleGpus();
         config.Server.CudaDeviceOrder = ComposeDeviceOrder();
+        config.Server.DisableGpuP2P = DisableGpuP2P;
         config.Server.HfToken = string.IsNullOrWhiteSpace(HfToken) ? null : HfToken.Trim();
         config.Server.ExtraArgs = SplitArgs(ExtraVllmArgs);
         config.Server.ExtraContainerArgs = SplitArgs(ExtraContainerArgs);
@@ -280,6 +291,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
                 TensorParallelSize = SelectedTensorParallel > 0 ? SelectedTensorParallel : 1,
                 VisibleGpus = ComposeVisibleGpus(),
                 CudaDeviceOrder = ComposeDeviceOrder(),
+                DisableGpuP2P = DisableGpuP2P,
                 HfToken = string.IsNullOrWhiteSpace(HfToken) ? null : "***",
                 ExtraArgs = SplitArgs(ExtraVllmArgs),
                 ExtraContainerArgs = SplitArgs(ExtraContainerArgs),

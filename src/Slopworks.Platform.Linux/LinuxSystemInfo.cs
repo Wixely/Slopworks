@@ -19,6 +19,7 @@ public sealed class LinuxSystemInfo(SlopworksPaths paths, IProcessRunner probes)
             UbuntuVersion = OsReleaseParser.GetUbuntuVersion(osRelease),
             Gpu = gpu,
             NvidiaHardwarePresent = gpu is not null || await DetectNvidiaHardwareAsync(ct),
+            HasNvLink = gpu is not null && await NvidiaSmiInventory.HasNvLinkAsync(probes, "nvidia-smi", ct),
             FreeDiskBytes = GetFreeDiskBytes(),
             TotalMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes,
         };

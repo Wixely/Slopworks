@@ -63,20 +63,51 @@ public class VllmServerControllerTests
         Assert.DoesNotContain("CUDA_DEVICE_ORDER", command);
     }
 
+    private static SystemProfile GpuProfileNvLink => GpuProfile with { HasNvLink = true };
+
     [Fact]
-    public void MultiGpu_OnWindows_DisablesCudaIpcPaths()
+    public void MultiGpu_OnWindows_NoNvLink_DisablesBothIpcPaths()
     {
         var config = new SlopworksConfig();
         config.Server.TensorParallelSize = 2;
 
-        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model"); // GpuProfile has no NVLink
 
-        // WSL can't do CUDA IPC / P2P — both fallbacks must be present for multi-GPU.
         if (OperatingSystem.IsWindows())
         {
             Assert.Contains("--disable-custom-all-reduce", command);
             Assert.Contains("-e NCCL_P2P_DISABLE=1", command);
         }
+    }
+
+    [Fact]
+    public void MultiGpu_OnWindows_WithNvLink_KeepsP2PButStillDisablesCustomAllReduce()
+    {
+        var config = new SlopworksConfig();
+        config.Server.TensorParallelSize = 2;
+
+        var command = Build(config).BuildRunCommand(GpuProfileNvLink, "org/model");
+
+        if (OperatingSystem.IsWindows())
+        {
+            // Custom all-reduce (CUDA IPC) is always unavailable on WSL...
+            Assert.Contains("--disable-custom-all-reduce", command);
+            // ...but NVLink works, so NCCL P2P must NOT be disabled.
+            Assert.DoesNotContain("NCCL_P2P_DISABLE", command);
+        }
+    }
+
+    [Fact]
+    public void MultiGpu_ExplicitDisableP2P_OverridesNvLink()
+    {
+        var config = new SlopworksConfig();
+        config.Server.TensorParallelSize = 2;
+        config.Server.DisableGpuP2P = true;
+
+        var command = Build(config).BuildRunCommand(GpuProfileNvLink, "org/model");
+
+        if (OperatingSystem.IsWindows())
+            Assert.Contains("-e NCCL_P2P_DISABLE=1", command);
     }
 
     [Fact]

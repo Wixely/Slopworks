@@ -52,3 +52,34 @@ public class GpuInventoryParserTests
     public void Parse_MalformedInput_YieldsNothing(string input)
         => Assert.Empty(GpuInventoryParser.Parse(input));
 }
+
+public class NvLinkDetectorTests
+{
+    [Fact]
+    public void HasNvLink_TrueWhenTopologyShowsNvLinks()
+    {
+        const string topo = """
+            	GPU0	GPU1	CPU Affinity	NUMA Affinity
+            GPU0	 X 	NV4	0-15		0
+            GPU1	NV4	 X 	0-15		0
+            """;
+
+        Assert.True(NvLinkDetector.HasNvLink(topo));
+    }
+
+    [Fact]
+    public void HasNvLink_FalseForPcieOnlyTopology()
+    {
+        const string topo = """
+            	GPU0	GPU1	CPU Affinity
+            GPU0	 X 	SYS	0-31
+            GPU1	SYS	 X 	0-31
+            """;
+
+        Assert.False(NvLinkDetector.HasNvLink(topo));
+    }
+
+    [Fact]
+    public void HasNvLink_NotFooledByTheWordNvidia()
+        => Assert.False(NvLinkDetector.HasNvLink("NVIDIA GeForce RTX 3090 topology unavailable"));
+}

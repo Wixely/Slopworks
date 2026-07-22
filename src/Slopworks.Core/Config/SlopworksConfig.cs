@@ -84,6 +84,13 @@ public sealed class ServerConfig
     /// Recommended PCI_BUS_ID on mixed-GPU machines so device indices are unambiguous.
     /// </summary>
     public string? CudaDeviceOrder { get; set; }
+
+    /// <summary>
+    /// Force NCCL peer-to-peer off (NCCL_P2P_DISABLE=1) for multi-GPU. null = automatic:
+    /// disabled when no NVLink is detected (WSL doesn't support PCIe peer-to-peer), left on
+    /// when NVLink is present so the bridge is used. Disabling P2P also disables NVLink.
+    /// </summary>
+    public bool? DisableGpuP2P { get; set; }
 }
 
 public sealed class ImagesConfig

@@ -60,6 +60,13 @@
                       ItemsSource="{Binding DeviceOrderOptions}" SelectedIndex="{Binding SelectedDeviceOrderIndex}" />
           </Grid>
 
+          <StackPanel IsVisible="{Binding HasGpus}" Spacing="2" Margin="0,4,0,0">
+            <CheckBox IsChecked="{Binding DisableGpuP2P}"
+                      Content="Disable GPU peer-to-peer / NVLink (NCCL_P2P_DISABLE) for multi-GPU"
+                      ToolTip.Tip="WSL doesn't support PCIe peer-to-peer, but NVLink works. Leave unchecked to use NVLink; check it if you have no NVLink or hit 'invalid resource handle'." />
+            <TextBlock Text="{Binding NvLinkHint}" FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="26,0,0,0" />
+          </StackPanel>
+
           <StackPanel IsVisible="{Binding HasGpus}" Spacing="2">
             <TextBlock Text="Use these GPUs" FontSize="13" Opacity="0.85" Margin="0,4,0,0" />
             <ItemsControl ItemsSource="{Binding Gpus}">

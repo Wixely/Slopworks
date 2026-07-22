@@ -44,6 +44,13 @@ public static class GpuInventoryParser
     }
 }
 
+/// <summary>Detects NVLink from the "nvidia-smi topo -m" matrix (cells like NV1..NV18).</summary>
+public static class NvLinkDetector
+{
+    public static bool HasNvLink(string topoMatrix)
+        => System.Text.RegularExpressions.Regex.IsMatch(topoMatrix, @"\bNV\d");
+}
+
 /// <summary>
 /// Runs nvidia-smi to enumerate GPUs, shared by the platform providers. Tries the full query
 /// (with PCI bus id) and falls back to name-only if the driver is too old to report PCI.
@@ -56,6 +63,20 @@ public static class NvidiaSmiInventory
         return withPci.Count > 0
             ? withPci
             : await TryQueryAsync(probes, exe, "index,name,memory.total", hasPci: false, ct);
+    }
+
+    /// <summary>True when nvidia-smi's topology matrix shows an NVLink link between GPUs.</summary>
+    public static async Task<bool> HasNvLinkAsync(IProcessRunner probes, string exe, CancellationToken ct)
+    {
+        try
+        {
+            var result = await probes.RunAsync(new ProcessSpec(exe, ["topo", "-m"]), null, ct);
+            return result.Succeeded && NvLinkDetector.HasNvLink(result.Stdout);
+        }
+        catch (Win32Exception)
+        {
+            return false;
+        }
     }
 
     private static async Task<IReadOnlyList<GpuDevice>> TryQueryAsync(

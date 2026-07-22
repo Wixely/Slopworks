@@ -20,6 +20,9 @@ public sealed record SystemProfile
     /// </summary>
     public bool NvidiaHardwarePresent { get; init; }
 
+    /// <summary>True when nvidia-smi reports an NVLink connection between GPUs.</summary>
+    public bool HasNvLink { get; init; }
+
     /// <summary>Null when not yet probed; false when virtualization is definitively unavailable.</summary>
     public bool? VirtualizationEnabled { get; init; }
 

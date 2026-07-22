@@ -22,6 +22,7 @@ public sealed class WindowsSystemInfo(SlopworksPaths paths, IProcessRunner probe
             OsBuild = Environment.OSVersion.Version.Build,
             Gpu = gpu,
             NvidiaHardwarePresent = gpu is not null || await DetectNvidiaHardwareAsync(ct),
+            HasNvLink = gpu is not null && await NvidiaSmiInventory.HasNvLinkAsync(probes, "nvidia-smi.exe", ct),
             FreeDiskBytes = GetFreeDiskBytes(),
             TotalMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes,
         };

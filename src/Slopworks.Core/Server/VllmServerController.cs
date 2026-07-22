@@ -76,9 +76,11 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
             if (config.Server.VisibleGpus is { Length: > 0 } gpus)
                 args.Add($"-e CUDA_VISIBLE_DEVICES={gpus}");
 
-            // Multi-GPU under WSL: CUDA IPC / GPU peer-to-peer aren't supported by WSL's GPU
-            // paravirtualization, so NCCL's P2P transport fails. Force it onto shared memory.
-            if (OperatingSystem.IsWindows() && config.Server.TensorParallelSize > 1)
+            // Multi-GPU under WSL: PCIe peer-to-peer isn't supported, so NCCL's P2P transport
+            // fails — unless an NVLink bridge is present, which does work and is much faster.
+            // Auto: disable P2P only without NVLink. Disabling P2P also disables NVLink.
+            if (OperatingSystem.IsWindows() && config.Server.TensorParallelSize > 1
+                && (config.Server.DisableGpuP2P ?? !profile.HasNvLink))
                 args.Add("-e NCCL_P2P_DISABLE=1");
         }
         else
