@@ -61,9 +61,12 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     [ObservableProperty] private string _port = "";
     [ObservableProperty] private string _model = "";
     [ObservableProperty] private string _gpuMemoryUtilization = "";
+    [ObservableProperty] private string _vllmLogLevel = "INFO";
     [ObservableProperty] private string _hfToken = "";
     [ObservableProperty] private string _extraVllmArgs = "";
     [ObservableProperty] private string _extraContainerArgs = "";
+
+    public IReadOnlyList<string> LogLevelOptions { get; } = ["DEBUG", "INFO", "WARNING", "ERROR"];
 
     // GPUs (populated from nvidia-smi when the tab is first viewed)
     public ObservableCollection<GpuCheckItemViewModel> Gpus { get; } = [];
@@ -192,6 +195,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         Port = config.Server.Port.ToString();
         Model = config.Server.Model;
         GpuMemoryUtilization = config.Server.GpuMemoryUtilization.ToString("0.##");
+        VllmLogLevel = string.IsNullOrWhiteSpace(config.Server.VllmLogLevel) ? "INFO" : config.Server.VllmLogLevel;
         HfToken = config.Server.HfToken ?? "";
         ExtraVllmArgs = string.Join(Environment.NewLine, config.Server.ExtraArgs);
         ExtraContainerArgs = string.Join(Environment.NewLine, config.Server.ExtraContainerArgs);
@@ -238,6 +242,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         config.Server.Port = port;
         config.Server.Model = Model.Trim();
         config.Server.GpuMemoryUtilization = gpuMem;
+        config.Server.VllmLogLevel = VllmLogLevel;
         config.Server.TensorParallelSize = SelectedTensorParallel > 0 ? SelectedTensorParallel : 1;
         config.Server.VisibleGpus = ComposeVisibleGpus();
         config.Server.CudaDeviceOrder = ComposeDeviceOrder();
@@ -288,6 +293,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
                 Port = port,
                 Model = Model.Trim(),
                 GpuMemoryUtilization = gpuMem,
+                VllmLogLevel = VllmLogLevel,
                 TensorParallelSize = SelectedTensorParallel > 0 ? SelectedTensorParallel : 1,
                 VisibleGpus = ComposeVisibleGpus(),
                 CudaDeviceOrder = ComposeDeviceOrder(),

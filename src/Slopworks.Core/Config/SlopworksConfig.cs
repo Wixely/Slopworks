@@ -66,6 +66,12 @@ public sealed class ServerConfig
     public double GpuMemoryUtilization { get; set; } = 0.90;
 
     /// <summary>
+    /// vLLM logging level (VLLM_LOGGING_LEVEL): DEBUG (most verbose — shows request detail,
+    /// useful for diagnosing 400s), INFO (default), WARNING, ERROR.
+    /// </summary>
+    public string VllmLogLevel { get; set; } = "INFO";
+
+    /// <summary>
     /// Split the model across this many GPUs (vLLM --tensor-parallel-size). 1 = single GPU.
     /// Must divide the model's attention-head count, and the cards should match (same arch
     /// and memory) — mixed GPUs are unreliable.

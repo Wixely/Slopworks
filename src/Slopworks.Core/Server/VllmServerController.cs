@@ -58,6 +58,9 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
             args.Add("-e NO_PROXY=localhost,127.0.0.1");
         }
 
+        if (config.Server.VllmLogLevel is { Length: > 0 } logLevel)
+            args.Add($"-e VLLM_LOGGING_LEVEL={logLevel}");
+
         if (profile.GpuPresent)
         {
             args.AddRange(["--device nvidia.com/gpu=all", "--ipc=host"]);

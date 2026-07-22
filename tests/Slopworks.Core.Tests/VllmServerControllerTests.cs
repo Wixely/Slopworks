@@ -210,6 +210,17 @@ public class VllmServerControllerTests
     }
 
     [Fact]
+    public void LogLevel_IsPassedAsEnvVar()
+    {
+        var config = new SlopworksConfig();
+        config.Server.VllmLogLevel = "DEBUG";
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains("-e VLLM_LOGGING_LEVEL=DEBUG", command);
+    }
+
+    [Fact]
     public void HfToken_NeverAppearsInTheCommandLine()
     {
         var config = new SlopworksConfig();
