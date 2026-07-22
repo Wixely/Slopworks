@@ -75,6 +75,11 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
             // Restrict which GPUs vLLM sees (all are exposed to the container via CDI).
             if (config.Server.VisibleGpus is { Length: > 0 } gpus)
                 args.Add($"-e CUDA_VISIBLE_DEVICES={gpus}");
+
+            // Multi-GPU under WSL: CUDA IPC / GPU peer-to-peer aren't supported by WSL's GPU
+            // paravirtualization, so NCCL's P2P transport fails. Force it onto shared memory.
+            if (OperatingSystem.IsWindows() && config.Server.TensorParallelSize > 1)
+                args.Add("-e NCCL_P2P_DISABLE=1");
         }
         else
         {
@@ -88,7 +93,14 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
         {
             args.Add($"--gpu-memory-utilization {config.Server.GpuMemoryUtilization:0.##}");
             if (config.Server.TensorParallelSize > 1)
+            {
                 args.Add($"--tensor-parallel-size {config.Server.TensorParallelSize}");
+
+                // The custom all-reduce uses CUDA IPC memory handles (open_mem_handle), which
+                // WSL doesn't support — "invalid resource handle". Fall back to NCCL.
+                if (OperatingSystem.IsWindows())
+                    args.Add("--disable-custom-all-reduce");
+            }
         }
         args.AddRange(config.Server.ExtraArgs);
 

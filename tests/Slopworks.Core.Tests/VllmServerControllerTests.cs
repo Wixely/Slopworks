@@ -64,6 +64,31 @@ public class VllmServerControllerTests
     }
 
     [Fact]
+    public void MultiGpu_OnWindows_DisablesCudaIpcPaths()
+    {
+        var config = new SlopworksConfig();
+        config.Server.TensorParallelSize = 2;
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        // WSL can't do CUDA IPC / P2P — both fallbacks must be present for multi-GPU.
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Contains("--disable-custom-all-reduce", command);
+            Assert.Contains("-e NCCL_P2P_DISABLE=1", command);
+        }
+    }
+
+    [Fact]
+    public void SingleGpu_DoesNotDisableCustomAllReduce()
+    {
+        var command = Build(new SlopworksConfig()).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.DoesNotContain("disable-custom-all-reduce", command);
+        Assert.DoesNotContain("NCCL_P2P_DISABLE", command);
+    }
+
+    [Fact]
     public void SingleGpuDefaults_OmitTensorParallelAndDeviceFlags()
     {
         var command = Build(new SlopworksConfig()).BuildRunCommand(GpuProfile, "org/model");

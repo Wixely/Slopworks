@@ -163,6 +163,12 @@ public sealed class VllmSmokeTestStep(VllmServerController server) : ISetupStep
                 => "vLLM force-disables pinned memory on WSL, so the V2 GPU runner fails. The fix is " +
                    "VLLM_WSL2_ENABLE_PIN_MEMORY=1, which Slopworks now sets automatically — update Slopworks " +
                    "and re-run setup (or add it under Settings → Extra container arguments).",
+            _ when text.Contains("invalid resource handle", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("open_mem_handle", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("CustomAllreduce", StringComparison.OrdinalIgnoreCase)
+                => "Multi-GPU failed: WSL doesn't support CUDA IPC / GPU peer-to-peer, so vLLM's custom " +
+                   "all-reduce can't share memory across GPUs. Slopworks now adds --disable-custom-all-reduce " +
+                   "and NCCL_P2P_DISABLE=1 for multi-GPU on WSL — update Slopworks and re-run setup.",
             _ when text.Contains("no kernel image is available", StringComparison.OrdinalIgnoreCase)
                 || text.Contains("sm_120", StringComparison.OrdinalIgnoreCase)
                 || text.Contains("kernel image", StringComparison.OrdinalIgnoreCase)
