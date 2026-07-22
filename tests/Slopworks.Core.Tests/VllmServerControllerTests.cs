@@ -210,6 +210,38 @@ public class VllmServerControllerTests
     }
 
     [Fact]
+    public void ToolCalling_OnByDefault_AddsAutoToolChoiceAndParser()
+    {
+        var command = Build(new SlopworksConfig()).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains("--enable-auto-tool-choice", command);
+        Assert.Contains("--tool-call-parser hermes", command);
+    }
+
+    [Fact]
+    public void ToolCalling_Disabled_OmitsTheFlags()
+    {
+        var config = new SlopworksConfig();
+        config.Server.EnableToolCalling = false;
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.DoesNotContain("enable-auto-tool-choice", command);
+        Assert.DoesNotContain("tool-call-parser", command);
+    }
+
+    [Fact]
+    public void ToolCallParser_IsConfigurable()
+    {
+        var config = new SlopworksConfig();
+        config.Server.ToolCallParser = "llama3_json";
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains("--tool-call-parser llama3_json", command);
+    }
+
+    [Fact]
     public void LogLevel_IsPassedAsEnvVar()
     {
         var config = new SlopworksConfig();

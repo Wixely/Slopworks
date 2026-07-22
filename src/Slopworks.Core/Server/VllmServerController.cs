@@ -107,6 +107,15 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
                     args.Add("--disable-custom-all-reduce");
             }
         }
+
+        // OpenAI tool / function calling — without this, tool_choice="auto" returns 400.
+        if (config.Server.EnableToolCalling)
+        {
+            args.Add("--enable-auto-tool-choice");
+            if (config.Server.ToolCallParser is { Length: > 0 } toolParser)
+                args.Add($"--tool-call-parser {toolParser}");
+        }
+
         args.AddRange(config.Server.ExtraArgs);
 
         return string.Join(" ", args);

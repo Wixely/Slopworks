@@ -72,6 +72,18 @@ public sealed class ServerConfig
     public string VllmLogLevel { get; set; } = "INFO";
 
     /// <summary>
+    /// Enable OpenAI tool / function calling (--enable-auto-tool-choice). On by default;
+    /// agents that send tools with tool_choice="auto" need it, else vLLM returns 400.
+    /// </summary>
+    public bool EnableToolCalling { get; set; } = true;
+
+    /// <summary>
+    /// vLLM --tool-call-parser, which must match the model's tool-call format. Common values:
+    /// hermes (Qwen/Hermes), llama3_json, mistral, pythonic. Only used when tool calling is on.
+    /// </summary>
+    public string ToolCallParser { get; set; } = "hermes";
+
+    /// <summary>
     /// Split the model across this many GPUs (vLLM --tensor-parallel-size). 1 = single GPU.
     /// Must divide the model's attention-head count, and the cards should match (same arch
     /// and memory) — mixed GPUs are unreliable.

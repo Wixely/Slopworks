@@ -47,6 +47,15 @@
                      MinHeight="56" FontFamily="Consolas,Menlo,monospace" FontSize="12" Margin="0,2"
                      PlaceholderText="--memory 24g" />
           </Grid>
+
+          <CheckBox IsChecked="{Binding EnableToolCalling}"
+                    Content="Enable tool / function calling (--enable-auto-tool-choice)"
+                    ToolTip.Tip="Agents that send tools with tool_choice=auto need this, or vLLM returns 400. On by default." />
+          <Grid ColumnDefinitions="220,*" IsVisible="{Binding EnableToolCalling}">
+            <TextBlock Text="Tool call parser" VerticalAlignment="Center"
+                       ToolTip.Tip="--tool-call-parser, must match the model's tool format. Common: hermes (Qwen/Hermes), llama3_json, mistral, pythonic." />
+            <TextBox Grid.Column="1" Text="{Binding ToolCallParser}" Margin="0,2" PlaceholderText="hermes" />
+          </Grid>
         </StackPanel>
 
         <StackPanel Spacing="8">
