@@ -158,6 +158,58 @@ public class VllmServerControllerTests
     }
 
     [Fact]
+    public async Task SnapshotLogs_WritesRealOutputToFile_AndReturnsIt()
+    {
+        var dir = Directory.CreateTempSubdirectory("slopworks-log-").FullName;
+        try
+        {
+            var paths = new SlopworksPaths(dir);
+            var controller = new VllmServerController(
+                new WslLinuxCommandFactory(SlopworksPaths.DistroName), new SlopworksConfig(), new HttpClient(), paths);
+            var runner = new FakeProcessRunner
+            {
+                Result = new Slopworks.Platform.Abstractions.ProcessResult(0, "INFO: starting vLLM\nRoute /v1/models", "", TimeSpan.Zero),
+            };
+
+            var text = await controller.SnapshotLogsAsync(runner, 500, CancellationToken.None);
+
+            Assert.Contains("starting vLLM", text);
+            var file = Path.Combine(paths.VllmLogsDir, VllmServerController.ServerLogFileName);
+            Assert.True(File.Exists(file));
+            Assert.Contains("Route /v1/models", await File.ReadAllTextAsync(file));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SnapshotLogs_ContainerMissing_ReturnsEmpty_AndWritesNothing()
+    {
+        var dir = Directory.CreateTempSubdirectory("slopworks-log-").FullName;
+        try
+        {
+            var paths = new SlopworksPaths(dir);
+            var controller = new VllmServerController(
+                new WslLinuxCommandFactory(SlopworksPaths.DistroName), new SlopworksConfig(), new HttpClient(), paths);
+            var runner = new FakeProcessRunner
+            {
+                Result = new Slopworks.Platform.Abstractions.ProcessResult(0, "Error: no such container slopworks-vllm", "", TimeSpan.Zero),
+            };
+
+            var text = await controller.SnapshotLogsAsync(runner, 500, CancellationToken.None);
+
+            Assert.Equal("", text);
+            Assert.False(File.Exists(Path.Combine(paths.VllmLogsDir, VllmServerController.ServerLogFileName)));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void HfToken_NeverAppearsInTheCommandLine()
     {
         var config = new SlopworksConfig();

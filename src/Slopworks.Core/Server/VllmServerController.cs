@@ -133,6 +133,37 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
     public Task<ProcessResult> GetLogsAsync(IProcessRunner processes, int tailLines, CancellationToken ct)
         => processes.RunAsync(linux.Command($"podman logs --tail {tailLines} {ContainerName} 2>&1 || true"), null, ct);
 
+    public const string ServerLogFileName = "server.log";
+
+    /// <summary>
+    /// Fetches the container log and, when there's real output, writes it to
+    /// logs/vllm/server.log so the file-based Logs tab always has the vLLM output — not just
+    /// after a failed smoke test. Returns the log text for a live view. No-op if the
+    /// container is gone (so the last saved log is preserved).
+    /// </summary>
+    public async Task<string> SnapshotLogsAsync(IProcessRunner processes, int tailLines, CancellationToken ct)
+    {
+        var result = await GetLogsAsync(processes, tailLines, ct);
+        var text = result.Stdout;
+
+        var containerMissing = text.Contains("no container", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("no such container", StringComparison.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrWhiteSpace(text) && !containerMissing)
+        {
+            try
+            {
+                Directory.CreateDirectory(paths.VllmLogsDir);
+                await File.WriteAllTextAsync(Path.Combine(paths.VllmLogsDir, ServerLogFileName), text, ct);
+            }
+            catch (IOException)
+            {
+            }
+        }
+
+        return containerMissing ? "" : text;
+    }
+
     public async Task<ServerHealth> GetHealthAsync(IProcessRunner processes, CancellationToken ct)
     {
         var state = await processes.RunAsync(

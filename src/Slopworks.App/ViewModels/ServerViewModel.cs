@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Slopworks.Core.Config;
@@ -11,7 +12,7 @@ namespace Slopworks.App.ViewModels;
 /// Direct server control. Buttons here run commands immediately — the click is the consent —
 /// but every command is still recorded in the audit log with attribution "server-ui".
 /// </summary>
-public partial class ServerViewModel(SlopworksHost host) : ObservableObject
+public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IActivatableTab
 {
     [ObservableProperty]
     private string _model = host.Config.Server.Model;
@@ -26,7 +27,17 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject
     private string _logs = "";
 
     [ObservableProperty]
+    private bool _isLiveLogging;
+
+    [ObservableProperty]
     private bool _isBusy;
+
+    private DispatcherTimer? _logTimer;
+    private bool _pollInFlight;
+
+    public string LiveLogsLabel => IsLiveLogging ? "Stop live logs" : "Live logs";
+
+    partial void OnIsLiveLoggingChanged(bool value) => OnPropertyChanged(nameof(LiveLogsLabel));
 
     [ObservableProperty]
     private bool _exposeToNetwork = host.Config.Server.ExposeToNetwork;
@@ -146,13 +157,62 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject
             UpdateNetworkStatus(actuallyEnabled, host.Config.Server.Port);
         });
 
+    /// <summary>Toggles a live tail that polls the container log every 2s and persists it.</summary>
     [RelayCommand]
-    private async Task TailLogsAsync()
-        => await RunBusyAsync(async () =>
+    private void ToggleLiveLogs()
+    {
+        if (IsLiveLogging)
         {
-            var logs = await host.Server.GetLogsAsync(Runner, 200, CancellationToken.None);
-            Logs = logs.Stdout.Trim().Length > 0 ? logs.Stdout : "(no log output — is the container running?)";
-        });
+            StopLiveLogs();
+            return;
+        }
+
+        IsLiveLogging = true;
+        _logTimer ??= CreateLogTimer();
+        _ = PollLogsAsync(); // fetch immediately, then on each tick
+        _logTimer.Start();
+    }
+
+    private DispatcherTimer CreateLogTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        timer.Tick += (_, _) => _ = PollLogsAsync();
+        return timer;
+    }
+
+    private void StopLiveLogs()
+    {
+        _logTimer?.Stop();
+        IsLiveLogging = false;
+    }
+
+    private async Task PollLogsAsync()
+    {
+        if (_pollInFlight)
+            return;
+
+        _pollInFlight = true;
+        try
+        {
+            var text = await host.Server.SnapshotLogsAsync(Runner, 500, CancellationToken.None);
+            Logs = string.IsNullOrWhiteSpace(text) ? "(no log output — is the container running?)" : text;
+        }
+        catch (Exception ex)
+        {
+            Logs = $"(log fetch failed: {ex.Message})";
+        }
+        finally
+        {
+            _pollInFlight = false;
+        }
+    }
+
+    // IActivatableTab: stop polling when the user leaves the Server tab.
+    public void Activate()
+    {
+    }
+
+    public void Deactivate() => StopLiveLogs();
 
     /// <summary>WSL localhost forwarding sometimes breaks after host sleep; a WSL restart fixes it.</summary>
     [RelayCommand]

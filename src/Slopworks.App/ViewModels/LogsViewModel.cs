@@ -39,8 +39,20 @@ public partial class LogsViewModel(SlopworksHost host) : ObservableObject, IActi
     }
 
     [RelayCommand]
-    private void Refresh()
+    private async Task RefreshAsync()
     {
+        // Capture the running vLLM container's log to a file so it always appears here,
+        // not only after a failed smoke test.
+        try
+        {
+            var runner = new RecordingProcessRunner(host.ProcessRunner, host.CommandLog, "logs-ui", "user-click");
+            await host.Server.SnapshotLogsAsync(runner, 2000, CancellationToken.None);
+        }
+        catch (Exception)
+        {
+            // The log list must still render even if the container probe fails.
+        }
+
         var previous = SelectedFile?.FullPath;
 
         Files.Clear();
