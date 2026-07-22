@@ -72,6 +72,13 @@ public sealed class ServerConfig
     public string VllmLogLevel { get; set; } = "INFO";
 
     /// <summary>
+    /// vLLM --quantization method. "auto" (or blank) detects it from the checkpoint / runs
+    /// full precision. Force one for weight compression: awq / gptq (pre-quantized 4-bit,
+    /// Ampere-ok), nvfp4 / modelopt_fp4 / fp8 (Blackwell/Hopper), bitsandbytes (on-the-fly).
+    /// </summary>
+    public string Quantization { get; set; } = "auto";
+
+    /// <summary>
     /// Enable OpenAI tool / function calling (--enable-auto-tool-choice). On by default;
     /// agents that send tools with tool_choice="auto" need it, else vLLM returns 400.
     /// </summary>

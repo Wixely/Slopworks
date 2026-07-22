@@ -242,6 +242,28 @@ public class VllmServerControllerTests
     }
 
     [Fact]
+    public void Quantization_Auto_OmitsTheFlag()
+    {
+        var command = Build(new SlopworksConfig()).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.DoesNotContain("--quantization", command);
+    }
+
+    [Theory]
+    [InlineData("awq")]
+    [InlineData("bitsandbytes")]
+    [InlineData("nvfp4")]
+    public void Quantization_Explicit_AddsTheFlag(string method)
+    {
+        var config = new SlopworksConfig();
+        config.Server.Quantization = method;
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains($"--quantization {method}", command);
+    }
+
+    [Fact]
     public void LogLevel_IsPassedAsEnvVar()
     {
         var config = new SlopworksConfig();

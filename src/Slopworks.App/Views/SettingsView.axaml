@@ -48,6 +48,13 @@
                      PlaceholderText="--memory 24g" />
           </Grid>
 
+          <Grid ColumnDefinitions="220,*">
+            <TextBlock Text="Quantization" VerticalAlignment="Center"
+                       ToolTip.Tip="--quantization. auto = detect from the checkpoint / full precision. awq, gptq = pre-quantized 4-bit (works on Ampere 3090). nvfp4, modelopt_fp4, fp8 = Blackwell/Hopper (5090). bitsandbytes = quantize a full-precision model on the fly." />
+            <ComboBox Grid.Column="1" MinWidth="220" Margin="0,2"
+                      ItemsSource="{Binding QuantizationOptions}" SelectedItem="{Binding Quantization}" />
+          </Grid>
+
           <CheckBox IsChecked="{Binding EnableToolCalling}"
                     Content="Enable tool / function calling (--enable-auto-tool-choice)"
                     ToolTip.Tip="Agents that send tools with tool_choice=auto need this, or vLLM returns 400. On by default." />

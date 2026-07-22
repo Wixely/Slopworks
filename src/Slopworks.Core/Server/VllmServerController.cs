@@ -94,6 +94,11 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
         args.AddRange(config.Server.ExtraContainerArgs);
         args.Add(image);
         args.Add($"--model {model}");
+
+        // "auto" (or blank) lets vLLM detect quantization from the checkpoint; anything else forces it.
+        if (config.Server.Quantization is { Length: > 0 } quant && !quant.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            args.Add($"--quantization {quant}");
+
         if (profile.GpuPresent)
         {
             args.Add($"--gpu-memory-utilization {config.Server.GpuMemoryUtilization:0.##}");

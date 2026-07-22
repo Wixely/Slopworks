@@ -62,6 +62,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     [ObservableProperty] private string _model = "";
     [ObservableProperty] private string _gpuMemoryUtilization = "";
     [ObservableProperty] private string _vllmLogLevel = "INFO";
+    [ObservableProperty] private string _quantization = "auto";
     [ObservableProperty] private bool _enableToolCalling = true;
     [ObservableProperty] private string _toolCallParser = "hermes";
     [ObservableProperty] private string _hfToken = "";
@@ -69,6 +70,9 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     [ObservableProperty] private string _extraContainerArgs = "";
 
     public IReadOnlyList<string> LogLevelOptions { get; } = ["DEBUG", "INFO", "WARNING", "ERROR"];
+
+    public IReadOnlyList<string> QuantizationOptions { get; } =
+        ["auto", "awq", "gptq", "compressed-tensors", "fp8", "nvfp4", "modelopt_fp4", "bitsandbytes"];
 
     // GPUs (populated from nvidia-smi when the tab is first viewed)
     public ObservableCollection<GpuCheckItemViewModel> Gpus { get; } = [];
@@ -198,6 +202,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         Model = config.Server.Model;
         GpuMemoryUtilization = config.Server.GpuMemoryUtilization.ToString("0.##");
         VllmLogLevel = string.IsNullOrWhiteSpace(config.Server.VllmLogLevel) ? "INFO" : config.Server.VllmLogLevel;
+        Quantization = string.IsNullOrWhiteSpace(config.Server.Quantization) ? "auto" : config.Server.Quantization;
         EnableToolCalling = config.Server.EnableToolCalling;
         ToolCallParser = config.Server.ToolCallParser;
         HfToken = config.Server.HfToken ?? "";
@@ -247,6 +252,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         config.Server.Model = Model.Trim();
         config.Server.GpuMemoryUtilization = gpuMem;
         config.Server.VllmLogLevel = VllmLogLevel;
+        config.Server.Quantization = string.IsNullOrWhiteSpace(Quantization) ? "auto" : Quantization;
         config.Server.EnableToolCalling = EnableToolCalling;
         config.Server.ToolCallParser = string.IsNullOrWhiteSpace(ToolCallParser) ? "hermes" : ToolCallParser.Trim();
         config.Server.TensorParallelSize = SelectedTensorParallel > 0 ? SelectedTensorParallel : 1;
@@ -300,6 +306,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
                 Model = Model.Trim(),
                 GpuMemoryUtilization = gpuMem,
                 VllmLogLevel = VllmLogLevel,
+                Quantization = string.IsNullOrWhiteSpace(Quantization) ? "auto" : Quantization,
                 EnableToolCalling = EnableToolCalling,
                 ToolCallParser = string.IsNullOrWhiteSpace(ToolCallParser) ? "hermes" : ToolCallParser.Trim(),
                 TensorParallelSize = SelectedTensorParallel > 0 ? SelectedTensorParallel : 1,
