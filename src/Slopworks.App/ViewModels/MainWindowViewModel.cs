@@ -13,8 +13,10 @@ public partial class MainWindowViewModel : ObservableObject
     public DashboardViewModel Dashboard { get; }
     public SetupWizardViewModel Wizard { get; }
     public ServerViewModel Server { get; }
+    public ModelsViewModel Models { get; }
     public MaintenanceViewModel Maintenance { get; }
     public SettingsViewModel Settings { get; }
+    public PlatformsViewModel Platforms { get; }
     public SystemUsageViewModel SystemUsage { get; }
     public LogsViewModel Logs { get; }
 
@@ -26,8 +28,10 @@ public partial class MainWindowViewModel : ObservableObject
         Dashboard = new DashboardViewModel(host);
         Wizard = new SetupWizardViewModel(host);
         Server = new ServerViewModel(host);
+        Models = new ModelsViewModel(host);
         Maintenance = new MaintenanceViewModel(host);
         Settings = new SettingsViewModel(host);
+        Platforms = new PlatformsViewModel(host);
         SystemUsage = new SystemUsageViewModel(host);
         Logs = new LogsViewModel(host);
 
@@ -53,9 +57,11 @@ public partial class MainWindowViewModel : ObservableObject
         1 => Wizard,
         2 => Server,
         3 => SystemUsage,
-        4 => Maintenance,
+        4 => Models,
         5 => Settings,
-        6 => Logs,
+        6 => Platforms,
+        7 => Maintenance,
+        8 => Logs,
         _ => this,
     };
 }

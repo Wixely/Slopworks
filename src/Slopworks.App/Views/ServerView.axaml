@@ -3,83 +3,136 @@
              xmlns:vm="using:Slopworks.App.ViewModels"
              x:Class="Slopworks.App.Views.ServerView"
              x:DataType="vm:ServerViewModel">
-  <Grid Margin="20" RowDefinitions="Auto,Auto,Auto,*">
+  <Grid Margin="20" RowDefinitions="Auto,*">
 
-    <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,14">
-      <DockPanel>
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <TextBlock Text="Profile" VerticalAlignment="Center" Opacity="0.75" />
-          <ComboBox MinWidth="200" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}"
-                    ToolTip.Tip="Active settings profile — switch it here; edit it on the Settings tab" />
-          <Button Content="Edit" Command="{Binding EditProfileCommand}"
-                  ToolTip.Tip="Open the Settings tab to edit this profile" />
+    <!-- Top: controls on the left, active profile + its command in the middle, live usage on the right -->
+    <Grid Grid.Row="0" ColumnDefinitions="*,16,340,16,Auto" Margin="0,0,0,12">
+
+      <!-- LEFT column -->
+      <StackPanel Grid.Column="0" Spacing="12">
+
+        <StackPanel Spacing="6">
+          <TextBlock Text="Server" FontSize="26" FontWeight="Bold" />
+          <TextBlock Text="{Binding StatusText}" Opacity="0.75" TextWrapping="Wrap" />
         </StackPanel>
-        <TextBlock Text="Server" FontSize="26" FontWeight="Bold" VerticalAlignment="Center" />
-      </DockPanel>
-      <TextBlock Text="{Binding StatusText}" Opacity="0.75" TextWrapping="Wrap" />
-    </StackPanel>
 
-    <Grid Grid.Row="1" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,0,0,10">
-      <TextBlock Grid.Row="0" Grid.Column="0" Text="Model (HuggingFace id)" VerticalAlignment="Center" Margin="0,0,10,6" />
-      <StackPanel Grid.Row="0" Grid.Column="1" Spacing="2" Margin="0,0,0,6">
-        <DockPanel>
-          <Button DockPanel.Dock="Right" Content="Copy" Click="CopyModel_Click" Margin="8,0,0,0"
-                  ToolTip.Tip="Copy the model id — agents must pass this exact value as their model parameter" />
-          <Button DockPanel.Dock="Right" Content="Check" Command="{Binding CheckModelCommand}" Margin="8,0,0,0"
-                  ToolTip.Tip="Ask HuggingFace whether vLLM can serve this repo (safetensors + a supported quant) — catches GGUF/MLX/private repos before you download." />
-          <TextBox Text="{Binding Model}" PlaceholderText="Qwen/Qwen2.5-0.5B-Instruct" />
-        </DockPanel>
-        <TextBlock Text="{Binding ModelAdvisory}" IsVisible="{Binding HasModelAdvisory}"
-                   Foreground="#E0A030" FontSize="12" TextWrapping="Wrap" />
-        <TextBlock Text="{Binding ModelCheckText}" IsVisible="{Binding HasModelCheck}"
-                   Foreground="{Binding ModelCheckBrush}" FontSize="12" TextWrapping="Wrap" />
+        <StackPanel Spacing="2">
+          <TextBlock Text="Model" Opacity="0.75" />
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Content="Copy" Click="CopyModel_Click" Margin="8,0,0,0"
+                    ToolTip.Tip="Copy the model id — agents must pass this exact value as their model parameter" />
+            <Button DockPanel.Dock="Right" Content="Check" Command="{Binding CheckModelCommand}" Margin="8,0,0,0"
+                    ToolTip.Tip="Ask HuggingFace whether vLLM can serve this model (safetensors + a supported quant)." />
+            <ComboBox ItemsSource="{Binding ModelIds}" SelectedItem="{Binding Model}" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="Models you've saved on the Models tab. Add or edit models there." />
+          </DockPanel>
+          <TextBlock Text="{Binding ModelAdvisory}" IsVisible="{Binding HasModelAdvisory}"
+                     Foreground="#E0A030" FontSize="12" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding ModelCheckText}" IsVisible="{Binding HasModelCheck}"
+                     Foreground="{Binding ModelCheckBrush}" FontSize="12" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Content="Start" Command="{Binding StartCommand}" Classes="accent" IsEnabled="{Binding !IsBusy}" />
+          <Button Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding !IsBusy}" />
+          <Button Content="Restart" Command="{Binding RestartCommand}" IsEnabled="{Binding !IsBusy}"
+                  ToolTip.Tip="Stop and start the container, applying the current model and settings" />
+          <Button Content="Refresh" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsBusy}" />
+          <Button Content="{Binding LiveLogsLabel}" Command="{Binding ToggleLiveLogsCommand}"
+                  ToolTip.Tip="Stream the vLLM container log below, updating every 2s. Also saved to the Logs tab." />
+          <Button Content="Copy logs" Click="CopyLogs_Click"
+                  ToolTip.Tip="Copy the full log text below to the clipboard" />
+          <Button Content="Fix port forwarding" Command="{Binding RepairForwardingCommand}" IsEnabled="{Binding !IsBusy}"
+                  ToolTip.Tip="Restarts WSL — use when localhost stops responding after the machine slept" />
+        </StackPanel>
+
+        <StackPanel Spacing="4">
+          <TextBlock Text="Agent endpoint (OpenAI-compatible)" FontWeight="SemiBold" FontSize="13" />
+          <ItemsControl ItemsSource="{Binding AgentUrls}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <DockPanel Margin="0,2" MaxWidth="560" HorizontalAlignment="Left">
+                  <Button DockPanel.Dock="Right" Content="Copy" Click="CopyUrl_Click" Margin="8,0,0,0"
+                          ToolTip.Tip="Copy this URL to the clipboard" />
+                  <TextBox Text="{Binding, Mode=OneWay}" IsReadOnly="True"
+                           FontFamily="Consolas,Menlo,monospace" FontSize="12" />
+                </DockPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="{Binding AgentHint}" FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <ToggleSwitch IsChecked="{Binding ExposeToNetwork}"
+                        OnContent="Open to network" OffContent="This machine only"
+                        ToolTip.Tip="Adds a port-scoped forward (0.0.0.0) and a firewall allow rule for the vLLM port only — nothing else on your network is touched, and turning it off removes exactly those two entries. Needs admin (UAC). The API has no authentication." />
+          <TextBlock Text="{Binding NetworkStatus}" VerticalAlignment="Center" FontSize="12" Opacity="0.75"
+                     TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
+                     ToolTip.Tip="{Binding NetworkStatus}" />
+        </StackPanel>
       </StackPanel>
-      <TextBlock Grid.Row="1" Grid.Column="0" Text="HuggingFace token" VerticalAlignment="Center" Margin="0,0,10,0" />
-      <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding HfToken}" PasswordChar="•" PlaceholderText="only needed for gated models" />
+
+      <!-- RIGHT column: active profile + the exact command it will run -->
+      <Grid Grid.Column="2" RowDefinitions="Auto,Auto,Auto,*">
+        <TextBlock Grid.Row="0" Text="Profile" FontWeight="SemiBold" FontSize="13" />
+        <DockPanel Grid.Row="1" Margin="0,4,0,0">
+          <Button DockPanel.Dock="Right" Content="Edit" Command="{Binding EditProfileCommand}" Margin="8,0,0,0"
+                  ToolTip.Tip="Open the Settings tab to edit this profile" />
+          <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" HorizontalAlignment="Stretch"
+                    ToolTip.Tip="Active settings profile — switch it here; edit it on the Settings tab" />
+        </DockPanel>
+
+        <TextBlock Grid.Row="2" Text="Command this profile will run" FontWeight="SemiBold" FontSize="13" Margin="0,14,0,4" />
+        <Border Grid.Row="3" Background="#18000000" CornerRadius="8" Padding="10">
+          <ScrollViewer>
+            <SelectableTextBlock Text="{Binding CommandPreview}" FontFamily="Consolas,Menlo,monospace"
+                                 FontSize="11" TextWrapping="Wrap" Opacity="0.9" />
+          </ScrollViewer>
+        </Border>
+      </Grid>
+
+      <!-- Right: compact live usage — colour-coded vertical bars, values in tooltips -->
+      <StackPanel Grid.Column="4" Spacing="4">
+        <TextBlock Text="Usage" FontWeight="SemiBold" FontSize="13" />
+        <StackPanel Orientation="Horizontal" Spacing="5">
+          <StackPanel Spacing="2">
+            <ProgressBar Orientation="Vertical" Minimum="0" Maximum="100" Value="{Binding CpuPercent}"
+                         Width="16" Height="120" Foreground="#1D4ED8" ToolTip.Tip="{Binding CpuLabel}" />
+            <TextBlock Text="C" FontSize="9" Opacity="0.55" HorizontalAlignment="Center" ToolTip.Tip="{Binding CpuLabel}" />
+          </StackPanel>
+          <StackPanel Spacing="2">
+            <ProgressBar Orientation="Vertical" Minimum="0" Maximum="100" Value="{Binding RamPercent}"
+                         Width="16" Height="120" Foreground="#60A5FA" ToolTip.Tip="{Binding RamLabel}" />
+            <TextBlock Text="R" FontSize="9" Opacity="0.55" HorizontalAlignment="Center" ToolTip.Tip="{Binding RamLabel}" />
+          </StackPanel>
+          <ItemsControl ItemsSource="{Binding Gpus}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="5" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:GpuUsageItemViewModel">
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                  <StackPanel Spacing="2">
+                    <ProgressBar Orientation="Vertical" Minimum="0" Maximum="100" Value="{Binding UtilizationPercent}"
+                                 Width="16" Height="120" Foreground="#15803D" ToolTip.Tip="{Binding UtilizationLabel}" />
+                    <TextBlock Text="G" FontSize="9" Opacity="0.55" HorizontalAlignment="Center" ToolTip.Tip="{Binding UtilizationLabel}" />
+                  </StackPanel>
+                  <StackPanel Spacing="2">
+                    <ProgressBar Orientation="Vertical" Minimum="0" Maximum="100" Value="{Binding VramPercent}"
+                                 Width="16" Height="120" Foreground="#4ADE80" ToolTip.Tip="{Binding VramLabel}" />
+                    <TextBlock Text="V" FontSize="9" Opacity="0.55" HorizontalAlignment="Center" ToolTip.Tip="{Binding VramLabel}" />
+                  </StackPanel>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </StackPanel>
     </Grid>
 
-    <StackPanel Grid.Row="2" Spacing="8" Margin="0,0,0,12">
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <Button Content="Start" Command="{Binding StartCommand}" Classes="accent" IsEnabled="{Binding !IsBusy}" />
-        <Button Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding !IsBusy}" />
-        <Button Content="Restart" Command="{Binding RestartCommand}" IsEnabled="{Binding !IsBusy}"
-                ToolTip.Tip="Stop and start the container, applying the current model and settings" />
-        <Button Content="Refresh" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsBusy}" />
-        <Button Content="{Binding LiveLogsLabel}" Command="{Binding ToggleLiveLogsCommand}"
-                ToolTip.Tip="Stream the vLLM container log below, updating every 2s. Also saved to the Logs tab." />
-        <Button Content="Copy logs" Click="CopyLogs_Click"
-                ToolTip.Tip="Copy the full log text below to the clipboard" />
-        <Button Content="Fix port forwarding" Command="{Binding RepairForwardingCommand}" IsEnabled="{Binding !IsBusy}"
-                ToolTip.Tip="Restarts WSL — use when localhost stops responding after the machine slept" />
-      </StackPanel>
-      <StackPanel Spacing="4" Margin="0,4,0,0">
-        <TextBlock Text="Agent endpoint (OpenAI-compatible)" FontWeight="SemiBold" FontSize="13" />
-        <ItemsControl ItemsSource="{Binding AgentUrls}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="x:String">
-              <DockPanel Margin="0,2" MaxWidth="560" HorizontalAlignment="Left">
-                <Button DockPanel.Dock="Right" Content="Copy" Click="CopyUrl_Click" Margin="8,0,0,0"
-                        ToolTip.Tip="Copy this URL to the clipboard" />
-                <TextBox Text="{Binding, Mode=OneWay}" IsReadOnly="True"
-                         FontFamily="Consolas,Menlo,monospace" FontSize="12" />
-              </DockPanel>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <TextBlock Text="{Binding AgentHint}" FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
-      </StackPanel>
-
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <ToggleSwitch IsChecked="{Binding ExposeToNetwork}"
-                      OnContent="Open to network" OffContent="This machine only"
-                      ToolTip.Tip="Adds a port-scoped forward (0.0.0.0) and a firewall allow rule for the vLLM port only — nothing else on your network is touched, and turning it off removes exactly those two entries. Needs admin (UAC). The API has no authentication." />
-        <TextBlock Text="{Binding NetworkStatus}" VerticalAlignment="Center" FontSize="12" Opacity="0.75"
-                   TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
-                   ToolTip.Tip="{Binding NetworkStatus}" />
-      </StackPanel>
-    </StackPanel>
-
-    <Border Grid.Row="3" Background="#18000000" CornerRadius="8" Padding="10">
+    <!-- Bottom: the live log -->
+    <Border Grid.Row="1" Background="#18000000" CornerRadius="8" Padding="10">
       <ScrollViewer Name="LogScroller">
         <SelectableTextBlock Text="{Binding Logs}" FontFamily="Consolas,Menlo,monospace" FontSize="12" Opacity="0.85"
                              TextWrapping="NoWrap" />

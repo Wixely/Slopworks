@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Slopworks.Core;
 using Slopworks.Core.Config;
+using Slopworks.Core.Engine;
 using Slopworks.Core.Logging;
 using Slopworks.Core.Server;
 using Slopworks.Platform.Abstractions;
@@ -58,6 +59,102 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
     public string? ModelAdvisory => ModelId.Advisory(Model);
     public bool HasModelAdvisory => ModelAdvisory is not null;
 
+    // Models to pick from (the library defined on the Models tab). Selection = the server model.
+    public ObservableCollection<string> ModelIds { get; } = [];
+    private bool _syncingModel;
+
+    /// <summary>The exact podman/vLLM command the active profile + selected model will run.</summary>
+    [ObservableProperty]
+    private string _commandPreview = "";
+
+    private SystemProfile _previewProfile = SystemProfile.Unknown;
+    private bool _profileProbed;
+
+    private void RefreshModels()
+    {
+        _syncingModel = true;
+        ModelIds.Clear();
+        foreach (var entry in host.Models.Models)
+            ModelIds.Add(entry.Id);
+        var current = host.Config.Server.Model;
+        if (current.Length > 0 && !ModelIds.Contains(current))
+            ModelIds.Add(current); // always show the active model, even if not saved in the library
+        Model = current;
+        _syncingModel = false;
+    }
+
+    private void UpdateCommandPreview()
+    {
+        try { CommandPreview = host.Server.BuildRunCommand(_previewProfile, Model); }
+        catch (Exception ex) { CommandPreview = ex.Message; }
+    }
+
+    private async Task EnsureProfileAsync()
+    {
+        if (_profileProbed)
+            return;
+        _profileProbed = true;
+        try { _previewProfile = await host.SystemInfo.GetProfileAsync(CancellationToken.None); }
+        catch (Exception) { /* preview falls back to the CPU command shape */ }
+        UpdateCommandPreview();
+    }
+
+    // Compact live usage (a mini version of the System tab), sampled only while this tab is visible.
+    [ObservableProperty] private double _cpuPercent;
+    [ObservableProperty] private double _ramPercent;
+    [ObservableProperty] private string _cpuLabel = "CPU —";
+    [ObservableProperty] private string _ramLabel = "RAM —";
+    public ObservableCollection<GpuUsageItemViewModel> Gpus { get; } = [];
+
+    private DispatcherTimer? _metricsTimer;
+    private bool _gpuSampleInFlight;
+
+    private void StartMetrics()
+    {
+        if (_metricsTimer is null)
+        {
+            _metricsTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            _metricsTimer.Tick += (_, _) => SampleMetrics();
+        }
+        SampleMetrics();
+        _metricsTimer.Start();
+    }
+
+    private void SampleMetrics()
+    {
+        var usage = host.Metrics.Sample();
+        CpuPercent = usage.CpuPercent;
+        CpuLabel = $"CPU {usage.CpuPercent:0}%";
+        RamPercent = usage.RamPercent;
+        RamLabel = usage.TotalRamBytes > 0
+            ? $"RAM {usage.RamPercent:0}% — {usage.UsedRamBytes / 1024.0 / 1024 / 1024:0.0} / {usage.TotalRamBytes / 1024.0 / 1024 / 1024:0.0} GB"
+            : "RAM —";
+        _ = SampleGpusAsync();
+    }
+
+    private async Task SampleGpusAsync()
+    {
+        if (_gpuSampleInFlight)
+            return;
+        _gpuSampleInFlight = true;
+        try
+        {
+            var samples = await Task.Run(() => host.GpuMetrics.SampleAsync(CancellationToken.None));
+            if (samples.Count != Gpus.Count || !samples.Select(s => s.Index).SequenceEqual(Gpus.Select(g => g.Index)))
+            {
+                Gpus.Clear();
+                foreach (var sample in samples)
+                    Gpus.Add(new GpuUsageItemViewModel(sample));
+            }
+            foreach (var sample in samples)
+                Gpus.FirstOrDefault(g => g.Index == sample.Index)?.Update(sample);
+        }
+        finally
+        {
+            _gpuSampleInFlight = false;
+        }
+    }
+
     private bool _applyingExposure;
 
     partial void OnModelChanged(string value)
@@ -68,6 +165,10 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
         // The previous check result is about a different id now.
         HasModelCheck = false;
         ModelCheckText = "";
+        UpdateCommandPreview();
+        if (_syncingModel || string.IsNullOrWhiteSpace(value))
+            return;
+        host.Models.Select(value); // picking a model here makes it the profile's server model
     }
 
     // Result of the "Check" button — does HuggingFace show a repo vLLM can actually serve?
@@ -139,8 +240,9 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
             return;
         host.Profiles.Switch(value);
         // Reflect the switched-in profile in this tab's fields.
-        Model = host.Config.Server.Model;
+        RefreshModels(); // the new profile may use a different model
         HfToken = host.Config.Server.HfToken ?? "";
+        UpdateCommandPreview();
         StatusText = $"Switched to profile '{host.Profiles.Active}'.";
     }
 
@@ -319,14 +421,20 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
     // IActivatableTab: stop polling when the user leaves the Server tab.
     public void Activate()
     {
-        // The active profile may have changed on the Settings tab while we were away — re-sync the
-        // dropdown and fields so Start/Restart don't write a stale model over the switched-in profile.
+        // The active profile / model may have changed on another tab while we were away — re-sync.
         RefreshProfiles();
-        Model = host.Config.Server.Model;
+        RefreshModels();
         HfToken = host.Config.Server.HfToken ?? "";
+        UpdateCommandPreview();
+        _ = EnsureProfileAsync();
+        StartMetrics();
     }
 
-    public void Deactivate() => StopLiveLogs();
+    public void Deactivate()
+    {
+        StopLiveLogs();
+        _metricsTimer?.Stop();
+    }
 
     /// <summary>WSL localhost forwarding sometimes breaks after host sleep; a WSL restart fixes it.</summary>
     [RelayCommand]

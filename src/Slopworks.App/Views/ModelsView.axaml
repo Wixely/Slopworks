@@ -1,0 +1,110 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Slopworks.App.ViewModels"
+             x:Class="Slopworks.App.Views.ModelsView"
+             x:DataType="vm:ModelsViewModel">
+  <Panel>
+    <Grid Margin="20" RowDefinitions="Auto,Auto,*">
+
+      <DockPanel Grid.Row="0" Margin="0,0,0,10">
+        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ShowAdvanced}" VerticalAlignment="Top"
+                      OnContent="Advanced on" OffContent="Show advanced"
+                      ToolTip.Tip="Show HF investigation tools — check a model's quant type, parameter size and vLLM suitability. Remembered across sessions." />
+        <StackPanel Spacing="6">
+          <TextBlock Text="Models" FontSize="26" FontWeight="Bold" />
+          <TextBlock Text="{Binding StatusText}" Opacity="0.75" TextWrapping="Wrap"
+                     MaxLines="2" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusText}" />
+        </StackPanel>
+      </DockPanel>
+
+      <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="0,0,0,12">
+        <TextBlock Grid.Column="0" Text="HuggingFace token" VerticalAlignment="Center" Margin="0,0,10,0" />
+        <TextBox Grid.Column="1" Text="{Binding HfToken}" PasswordChar="•"
+                 PlaceholderText="recommended — anonymous HF checks hit a tiny shared rate limit" />
+      </Grid>
+
+      <Grid Grid.Row="2" ColumnDefinitions="290,16,*">
+
+        <!-- Left: the model library list + add / delete -->
+        <Grid Grid.Column="0" RowDefinitions="*,Auto,Auto">
+          <ListBox Grid.Row="0" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ModelItemViewModel">
+                <DockPanel Margin="0,2">
+                  <Button DockPanel.Dock="Right" Content="↗" Click="OpenHf_Click" Padding="6,0" Margin="4,0,0,0"
+                          Background="Transparent" VerticalAlignment="Center"
+                          ToolTip.Tip="Open this model's HuggingFace page" />
+                  <StackPanel Spacing="1">
+                    <TextBlock Text="{Binding Id}" FontFamily="Consolas,Menlo,monospace" FontSize="12"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding VerdictLabel}" Foreground="{Binding VerdictBrush}" FontSize="11"
+                               IsVisible="{Binding HasMetadata}" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                </DockPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <TextBox Grid.Row="1" Text="{Binding NewModelId}" Margin="0,8,0,0"
+                   PlaceholderText="add model id (org/name)" />
+          <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
+            <Button Content="Add" Command="{Binding AddModelCommand}" />
+            <Button Content="Delete" Command="{Binding DeleteModelCommand}" />
+          </StackPanel>
+        </Grid>
+
+        <!-- Right: detail for the selected model -->
+        <ScrollViewer Grid.Column="2" IsVisible="{Binding HasSelection}">
+          <StackPanel Spacing="10">
+            <DockPanel>
+              <Button DockPanel.Dock="Right" Content="Open on HuggingFace ↗" Click="OpenHf_Click" VerticalAlignment="Center"
+                      ToolTip.Tip="Open the selected model's HuggingFace page in your browser" />
+              <SelectableTextBlock Text="{Binding SelectedModel.Id}" FontFamily="Consolas,Menlo,monospace"
+                                   FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+            </DockPanel>
+
+            <DockPanel>
+              <Button DockPanel.Dock="Right" Content="Save notes" Command="{Binding SaveNotesCommand}" />
+              <TextBlock Text="Notes" FontWeight="SemiBold" Opacity="0.85" VerticalAlignment="Center" />
+            </DockPanel>
+            <TextBox Text="{Binding SelectedModel.Notes}" AcceptsReturn="True" MinHeight="120"
+                     TextWrapping="Wrap" PlaceholderText="notes about this model — hardware it fits, quant, quirks…" />
+
+            <StackPanel Spacing="8" IsVisible="{Binding ShowAdvanced}">
+              <TextBlock Text="HuggingFace investigation" FontWeight="SemiBold" FontSize="14" Margin="0,6,0,0" />
+              <TextBlock Text="Reads the repo's files and config to judge whether vLLM can serve it, the quantization type (GGUF/MLX won't work), and the parameter size."
+                         FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+              <Button Content="Check on HuggingFace" Command="{Binding CheckModelCommand}" HorizontalAlignment="Left" />
+              <Border IsVisible="{Binding SelectedModel.HasMetadata}" Background="#14000000" CornerRadius="6" Padding="10">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="{Binding SelectedModel.VerdictLabel}" Foreground="{Binding SelectedModel.VerdictBrush}"
+                             FontWeight="SemiBold" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding SelectedModel.Metadata}" Opacity="0.8" FontSize="12" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding SelectedModel.Facts}" Opacity="0.8" FontSize="12" TextWrapping="Wrap" />
+                  <SelectableTextBlock Text="{Binding SelectedModel.DetailText}" Opacity="0.7" FontSize="12"
+                                       TextWrapping="Wrap" Margin="0,2,0,0" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+
+        <TextBlock Grid.Column="2" Text="Add a model on the left, then select it to add notes or check it."
+                   IsVisible="{Binding !HasSelection}" Opacity="0.5" VerticalAlignment="Top" TextWrapping="Wrap" />
+      </Grid>
+    </Grid>
+
+    <!-- Popup: warn when no HF token is set (checks burn the anonymous quota fast) -->
+    <Border IsVisible="{Binding IsTokenWarningVisible}" Background="#99000000">
+      <Border Background="#242424" CornerRadius="10" Padding="22" MaxWidth="440"
+              HorizontalAlignment="Center" VerticalAlignment="Center"
+              BorderBrush="#E0A030" BorderThickness="1">
+        <StackPanel Spacing="12">
+          <TextBlock Text="No HuggingFace token set" FontWeight="Bold" FontSize="16" />
+          <TextBlock TextWrapping="Wrap" Opacity="0.85"
+                     Text="Checking models calls the HuggingFace API. Without a token these requests share a tiny anonymous rate limit, so this page will use up the free quota very quickly. Add a token in the field above (create one at huggingface.co → Settings → Access Tokens)." />
+          <Button Content="Got it" Command="{Binding DismissTokenWarningCommand}" HorizontalAlignment="Right" Classes="accent" />
+        </StackPanel>
+      </Border>
+    </Border>
+  </Panel>
+</UserControl>

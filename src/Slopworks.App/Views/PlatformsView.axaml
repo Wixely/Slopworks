@@ -1,0 +1,81 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Slopworks.App.ViewModels"
+             x:Class="Slopworks.App.Views.PlatformsView"
+             x:DataType="vm:PlatformsViewModel">
+  <Grid Margin="20" RowDefinitions="Auto,*">
+
+    <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,12">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="Save" Command="{Binding SaveCommand}" Classes="accent" />
+        <TextBlock Text="Platform" FontSize="26" FontWeight="Bold" />
+      </DockPanel>
+      <TextBlock Text="{Binding StatusText}" Opacity="0.75" TextWrapping="Wrap"
+                 MaxLines="2" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusText}" />
+    </StackPanel>
+
+    <Grid Grid.Row="1" ColumnDefinitions="*,16,300">
+
+      <!-- Left: the selected platform's images + distro source -->
+      <ScrollViewer Grid.Column="0">
+        <StackPanel Spacing="18">
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Container images" FontWeight="SemiBold" FontSize="16" />
+            <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto">
+              <TextBlock Grid.Row="0" Text="GPU image" VerticalAlignment="Center" />
+              <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding GpuImage}" Margin="0,2" />
+              <TextBlock Grid.Row="1" Text="CPU image" VerticalAlignment="Center" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CpuImage}" Margin="0,2" />
+            </Grid>
+          </StackPanel>
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Distro source" FontWeight="SemiBold" FontSize="16" />
+            <ToggleSwitch IsChecked="{Binding UseWslCatalog}"
+                          OnContent="Official WSL catalog" OffContent="Custom rootfs tarball" />
+            <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto">
+              <TextBlock Grid.Row="0" Text="Catalog distro name" VerticalAlignment="Center"
+                         ToolTip.Tip="As listed by: wsl --list --online" />
+              <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CatalogDistroName}" Margin="0,2" />
+              <TextBlock Grid.Row="1" Text="Rootfs URL (tarball mode)" VerticalAlignment="Center" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding RootfsUrl}" Margin="0,2" />
+              <TextBlock Grid.Row="2" Text="Checksum URL (tarball mode)" VerticalAlignment="Center" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding RootfsChecksumUrl}" Margin="0,2" />
+            </Grid>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- Right: platform management -->
+      <Border Grid.Column="2" Background="#14000000" CornerRadius="8" Padding="12">
+        <Grid RowDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto">
+          <TextBlock Grid.Row="0" Text="Platforms" FontWeight="SemiBold" FontSize="16" />
+          <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="4" Margin="0,2,0,8">
+            <TextBlock Text="Default:" Opacity="0.6" FontSize="12" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding DefaultPlatform}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+          </StackPanel>
+          <ListBox Grid.Row="2" MinHeight="140" ItemsSource="{Binding Platforms}"
+                   SelectedItem="{Binding SelectedPlatform}" />
+          <DockPanel Grid.Row="3" Margin="0,8,0,0">
+            <Button DockPanel.Dock="Right" Content="Rename" Command="{Binding RenamePlatformCommand}" Margin="8,0,0,0"
+                    ToolTip.Tip="Rename the selected platform" />
+            <TextBox Text="{Binding PlatformNameEdit}" ToolTip.Tip="Edit the selected platform's name, then press Rename" />
+          </DockPanel>
+          <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="6" Margin="0,6,0,0">
+            <Button Content="New" Command="{Binding CreatePlatformCommand}"
+                    ToolTip.Tip="Create a new platform (auto-named — rename it above)" />
+            <Button Content="Duplicate" Command="{Binding DuplicatePlatformCommand}"
+                    ToolTip.Tip="Copy the selected platform (auto-named)" />
+          </StackPanel>
+          <Button Grid.Row="5" Content="Set as default" Command="{Binding SetDefaultCommand}"
+                  IsEnabled="{Binding !IsSelectedDefault}" HorizontalAlignment="Stretch" Margin="0,6,0,0"
+                  ToolTip.Tip="Profiles that don't pick a platform use the default" />
+          <Button Grid.Row="6" Content="Delete" Command="{Binding DeletePlatformCommand}"
+                  HorizontalAlignment="Stretch" Margin="0,6,0,0"
+                  ToolTip.Tip="Delete the selected platform — press twice to confirm" />
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

@@ -115,12 +115,16 @@ public class ModelInspectorTests
     }
 
     [Fact]
-    public void ParseModelApi_ExtractsFilesAndTags()
+    public void ParseModelApi_ExtractsFilesTagsParamsAndFacts()
     {
         var json = """
         {
           "id": "org/model",
-          "tags": ["text-generation", "mlx"],
+          "tags": ["text-generation", "mlx", "license:apache-2.0"],
+          "pipeline_tag": "image-text-to-text",
+          "downloads": 123456,
+          "gated": "manual",
+          "safetensors": { "parameters": { "BF16": 32763876352 }, "total": 32763876352 },
           "siblings": [
             {"rfilename": "config.json"},
             {"rfilename": "model.safetensors"},
@@ -129,18 +133,55 @@ public class ModelInspectorTests
         }
         """;
 
-        var (files, tags) = ModelInspector.ParseModelApi(json);
+        var meta = ModelInspector.ParseModelApi(json);
 
-        Assert.Equal(["config.json", "model.safetensors", "README.md"], files);
-        Assert.Contains("mlx", tags);
+        Assert.Equal(["config.json", "model.safetensors", "README.md"], meta.Files);
+        Assert.Contains("mlx", meta.Tags);
+        Assert.Equal(32763876352, meta.Parameters);
+        Assert.Equal("image-text-to-text", meta.Pipeline);
+        Assert.Equal("apache-2.0", meta.License);
+        Assert.True(meta.Gated);
+        Assert.Equal(123456, meta.Downloads);
     }
 
     [Fact]
     public void ParseModelApi_MalformedJson_ReturnsEmpty()
     {
-        var (files, tags) = ModelInspector.ParseModelApi("not json at all");
+        var meta = ModelInspector.ParseModelApi("not json at all");
 
-        Assert.Empty(files);
-        Assert.Empty(tags);
+        Assert.Empty(meta.Files);
+        Assert.Empty(meta.Tags);
+        Assert.Null(meta.Parameters);
+        Assert.False(meta.Gated);
+    }
+
+    [Fact]
+    public void Classify_SurfacesAllMetadata()
+    {
+        var config = """
+        {"architectures":["Qwen2ForCausalLM"],"quantization_config":{"quant_method":"awq"},
+         "max_position_embeddings":32768,"torch_dtype":"bfloat16"}
+        """;
+        var probe = new ModelProbe(true, ["config.json", "model.safetensors"], [], config,
+            Parameters: 32_763_876_352, Pipeline: "text-generation", License: "apache-2.0", Gated: true, Downloads: 999);
+
+        var result = ModelConfigClassifier.Classify("Qwen/Qwen2.5-32B-AWQ", probe);
+
+        Assert.Equal("awq", result.Quant);
+        Assert.Equal("Qwen2ForCausalLM", result.Architecture);
+        Assert.Equal("32.8B", result.ParametersText);
+        Assert.Equal(32768, result.MaxContext);
+        Assert.Equal("bfloat16", result.Dtype);
+        Assert.Equal("text-generation", result.Pipeline);
+        Assert.Equal("apache-2.0", result.License);
+        Assert.True(result.Gated);
+        Assert.Equal(999, result.Downloads);
+    }
+
+    [Fact]
+    public void ParametersText_FormatsMillionsAndUnknown()
+    {
+        Assert.Equal("—", new ModelInspection(ModelVerdict.Unknown, "", "").ParametersText);
+        Assert.Equal("494M", new ModelInspection(ModelVerdict.Servable, "", "") { Parameters = 494_000_000 }.ParametersText);
     }
 }

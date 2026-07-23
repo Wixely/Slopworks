@@ -21,11 +21,17 @@
     <TabItem Header="System">
       <views:SystemUsageView DataContext="{Binding SystemUsage}" />
     </TabItem>
-    <TabItem Header="Maintenance">
-      <views:MaintenanceView DataContext="{Binding Maintenance}" />
+    <TabItem Header="Models">
+      <views:ModelsView DataContext="{Binding Models}" />
     </TabItem>
     <TabItem Header="Settings">
       <views:SettingsView DataContext="{Binding Settings}" />
+    </TabItem>
+    <TabItem Header="Platform">
+      <views:PlatformsView DataContext="{Binding Platforms}" />
+    </TabItem>
+    <TabItem Header="Maintenance">
+      <views:MaintenanceView DataContext="{Binding Maintenance}" />
     </TabItem>
     <TabItem Header="Logs">
       <views:LogsView DataContext="{Binding Logs}" />

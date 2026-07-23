@@ -21,15 +21,61 @@ public enum ModelVerdict
     Servable,
 }
 
-/// <summary>The verdict plus a one-line summary and a fuller explanation for the UI.</summary>
-public sealed record ModelInspection(ModelVerdict Verdict, string Summary, string Detail);
+/// <summary>The verdict plus a one-line summary, a fuller explanation, and structured metadata.</summary>
+public sealed record ModelInspection(ModelVerdict Verdict, string Summary, string Detail)
+{
+    /// <summary>Quantization label: awq / gptq / gguf / mlx / none / … (null when unknown).</summary>
+    public string? Quant { get; init; }
+    public string? Architecture { get; init; }
+
+    /// <summary>Total parameter count from the HF safetensors metadata, when published.</summary>
+    public long? Parameters { get; init; }
+
+    /// <summary>Max context length (config.json max_position_embeddings) — ties to the Context size setting.</summary>
+    public int? MaxContext { get; init; }
+
+    /// <summary>Weight dtype (config.json torch_dtype), e.g. bfloat16.</summary>
+    public string? Dtype { get; init; }
+
+    /// <summary>HF task, e.g. text-generation or image-text-to-text (multimodal).</summary>
+    public string? Pipeline { get; init; }
+
+    public string? License { get; init; }
+
+    /// <summary>Whether the repo is gated (needs terms acceptance + a token).</summary>
+    public bool Gated { get; init; }
+
+    public long? Downloads { get; init; }
+
+    /// <summary>Human parameter size, e.g. "32.8B" (or "—" when unknown).</summary>
+    public string ParametersText => FormatCount(Parameters);
+
+    public static string FormatCount(long? value) => value is { } p and > 0
+        ? p >= 1_000_000_000 ? $"{p / 1e9:0.#}B" : p >= 1_000_000 ? $"{p / 1e6:0.#}M" : p.ToString("N0")
+        : "—";
+}
 
 /// <summary>Raw facts gathered about a repo — the input to the (pure, testable) classifier.</summary>
 public sealed record ModelProbe(
     bool Found,
     IReadOnlyList<string> Files,
     IReadOnlyList<string> Tags,
-    string? ConfigJson);
+    string? ConfigJson,
+    long? Parameters = null,
+    string? Pipeline = null,
+    string? License = null,
+    bool Gated = false,
+    long? Downloads = null);
+
+/// <summary>The interesting fields from a HuggingFace /api/models/{id} response.</summary>
+public sealed record HfApiMeta(
+    IReadOnlyList<string> Files,
+    IReadOnlyList<string> Tags,
+    long? Parameters,
+    string? Pipeline,
+    string? License,
+    bool Gated,
+    long? Downloads);
 
 /// <summary>
 /// Pure decision logic: given a repo's files/tags/config.json, decide whether vLLM can serve it.
@@ -51,7 +97,7 @@ public static class ModelConfigClassifier
         if (!probe.Found)
             return new(ModelVerdict.Unservable, "Repository not found",
                 $"HuggingFace has no repo '{id}'. Check the id is 'namespace/name' (not an Ollama or URL form). " +
-                "If it's private or gated, set a HuggingFace token in Settings and re-check.");
+                "If it's private or gated, set a HuggingFace token and re-check.");
 
         var hasSafetensors = probe.Files.Any(f => f.EndsWith(".safetensors", Ic));
         var hasGguf = probe.Files.Any(f => f.EndsWith(".gguf", Ic));
@@ -59,26 +105,42 @@ public static class ModelConfigClassifier
         var taggedMlx = probe.Tags.Any(t => t.Contains("mlx", Ic));
         var hasMmproj = probe.Files.Any(f => f.Contains("mmproj", Ic));
 
+        var (quant, arch, modelType, hybrid, maxContext, dtype) = probe.ConfigJson is { } cfg
+            ? ReadConfig(cfg)
+            : (null, null, null, false, null, null);
+
+        // Attach the shared metadata (arch, params, context, license, …) to every verdict.
+        ModelInspection Make(ModelVerdict v, string summary, string detail, string? quantLabel) =>
+            new(v, summary, detail)
+            {
+                Quant = quantLabel,
+                Architecture = arch,
+                Parameters = probe.Parameters,
+                MaxContext = maxContext,
+                Dtype = dtype,
+                Pipeline = probe.Pipeline,
+                License = probe.License,
+                Gated = probe.Gated,
+                Downloads = probe.Downloads,
+            };
+
         // GGUF-only → llama.cpp/Ollama territory, no config.json, vLLM can't load it.
         if (hasGguf && !hasSafetensors)
-            return new(ModelVerdict.Unservable, "GGUF-only — vLLM can't serve this",
+            return Make(ModelVerdict.Unservable, "GGUF-only — vLLM can't serve this",
                 "The repo ships .gguf files (llama.cpp/Ollama format) and no safetensors, so vLLM has no " +
                 "config.json/checkpoint to load. Run it in Ollama or LM Studio, or find an AWQ / GPTQ / FP8 " +
-                "safetensors build for vLLM." + (hasMmproj ? " (The mmproj file is llama.cpp's vision projector.)" : ""));
+                "safetensors build for vLLM." + (hasMmproj ? " (The mmproj file is llama.cpp's vision projector.)" : ""),
+                "gguf");
 
         if (!hasSafetensors && !hasConfig)
-            return new(ModelVerdict.Unservable, "No safetensors / config.json",
-                "vLLM needs a HuggingFace-format checkpoint (config.json + .safetensors); this repo has neither.");
+            return Make(ModelVerdict.Unservable, "No safetensors / config.json",
+                "vLLM needs a HuggingFace-format checkpoint (config.json + .safetensors); this repo has neither.", null);
 
         // MLX (Apple Silicon) — safetensors but a quantization scheme vLLM can't read.
         if (taggedMlx || (probe.ConfigJson is { } mlxCfg && LooksLikeMlx(mlxCfg)))
-            return new(ModelVerdict.Unservable, "MLX (Apple Silicon) — not vLLM",
+            return Make(ModelVerdict.Unservable, "MLX (Apple Silicon) — not vLLM",
                 "This is an mlx-lm model quantized for Apple Silicon. vLLM can't read MLX quantization and it " +
-                "won't use NVIDIA GPUs. Use an AWQ / GPTQ / FP8 safetensors build instead.");
-
-        var (quant, arch, modelType, hybrid) = probe.ConfigJson is { } cfg
-            ? ReadConfig(cfg)
-            : (null, null, null, false);
+                "won't use NVIDIA GPUs. Use an AWQ / GPTQ / FP8 safetensors build instead.", "mlx");
 
         var archNote = arch is null ? "" : $" Architecture: {arch}{(modelType is null ? "" : $" ({modelType})")}.";
         var hybridNote = hybrid
@@ -89,16 +151,18 @@ public static class ModelConfigClassifier
         if (quant is { Length: > 0 })
         {
             var supported = KnownQuantMethods.Contains(quant, StringComparer.OrdinalIgnoreCase);
-            return new(supported && !hybrid ? ModelVerdict.Servable : ModelVerdict.Caution,
+            return Make(supported && !hybrid ? ModelVerdict.Servable : ModelVerdict.Caution,
                 supported ? $"Servable — {quant} safetensors" : $"Quantization '{quant}' — verify vLLM support",
                 $"Safetensors checkpoint, quantization method '{quant}'." +
                 (supported ? " vLLM supports this method." : " That isn't a method vLLM commonly supports — check before serving.") +
-                archNote + hybridNote);
+                archNote + hybridNote,
+                quant);
         }
 
-        return new(hybrid ? ModelVerdict.Caution : ModelVerdict.Servable, "Servable — full-precision safetensors",
+        return Make(hybrid ? ModelVerdict.Caution : ModelVerdict.Servable, "Servable — full-precision safetensors",
             "Full-precision safetensors (no quantization_config). It'll load but needs the most VRAM — consider a " +
-            "pre-quantized AWQ/GPTQ build, or set Quantization = bitsandbytes to compress it on the fly." + archNote + hybridNote);
+            "pre-quantized AWQ/GPTQ build, or set Quantization = bitsandbytes to compress it on the fly." + archNote + hybridNote,
+            "none");
     }
 
     /// <summary>MLX writes a top-level "quantization" object (not "quantization_config") with group_size/bits.</summary>
@@ -117,7 +181,7 @@ public static class ModelConfigClassifier
         }
     }
 
-    internal static (string? Quant, string? Arch, string? ModelType, bool Hybrid) ReadConfig(string configJson)
+    internal static (string? Quant, string? Arch, string? ModelType, bool Hybrid, int? MaxContext, string? Dtype) ReadConfig(string configJson)
     {
         try
         {
@@ -138,12 +202,20 @@ public static class ModelConfigClassifier
             if (root.TryGetProperty("model_type", out var mt) && mt.ValueKind == JsonValueKind.String)
                 modelType = mt.GetString();
 
+            int? maxContext = null;
+            if (root.TryGetProperty("max_position_embeddings", out var mpe) && mpe.TryGetInt32(out var ctx) && ctx > 0)
+                maxContext = ctx;
+
+            string? dtype = null;
+            if (root.TryGetProperty("torch_dtype", out var dt) && dt.ValueKind == JsonValueKind.String)
+                dtype = dt.GetString();
+
             var hybrid = configJson.Contains("mamba", Ic) || configJson.Contains("linear_attention", Ic);
-            return (quant, arch, modelType, hybrid);
+            return (quant, arch, modelType, hybrid, maxContext, dtype);
         }
         catch (JsonException)
         {
-            return (null, null, null, false);
+            return (null, null, null, false, null, null);
         }
     }
 }
@@ -196,10 +268,10 @@ public sealed class ModelInspector(HttpClient http, SlopworksConfig config)
                 return new(ModelVerdict.Unknown, $"HuggingFace returned {(int)api.StatusCode}",
                     "Couldn't read the repo metadata — try again shortly.");
 
-            var (files, tags) = ParseModelApi(await api.Content.ReadAsStringAsync(ct));
+            var meta = ParseModelApi(await api.Content.ReadAsStringAsync(ct));
 
             string? configJson = null;
-            if (files.Any(f => f.Equals("config.json", StringComparison.OrdinalIgnoreCase)))
+            if (meta.Files.Any(f => f.Equals("config.json", StringComparison.OrdinalIgnoreCase)))
             {
                 try
                 {
@@ -213,7 +285,8 @@ public sealed class ModelInspector(HttpClient http, SlopworksConfig config)
                 }
             }
 
-            return ModelConfigClassifier.Classify(id, new ModelProbe(true, files, tags, configJson));
+            return ModelConfigClassifier.Classify(id, new ModelProbe(
+                true, meta.Files, meta.Tags, configJson, meta.Parameters, meta.Pipeline, meta.License, meta.Gated, meta.Downloads));
         }
     }
 
@@ -225,11 +298,14 @@ public sealed class ModelInspector(HttpClient http, SlopworksConfig config)
         return await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
     }
 
-    /// <summary>Extract the file list (siblings) and tags from a HuggingFace /api/models/{id} response.</summary>
-    public static (IReadOnlyList<string> Files, IReadOnlyList<string> Tags) ParseModelApi(string json)
+    /// <summary>Extract the interesting fields from a HuggingFace /api/models/{id} response.</summary>
+    public static HfApiMeta ParseModelApi(string json)
     {
         var files = new List<string>();
         var tags = new List<string>();
+        long? parameters = null, downloads = null;
+        string? pipeline = null, license = null;
+        var gated = false;
         try
         {
             using var doc = JsonDocument.Parse(json);
@@ -243,13 +319,38 @@ public sealed class ModelInspector(HttpClient http, SlopworksConfig config)
             if (root.TryGetProperty("tags", out var t) && t.ValueKind == JsonValueKind.Array)
                 foreach (var tag in t.EnumerateArray())
                     if (tag.ValueKind == JsonValueKind.String && tag.GetString() is { } value)
+                    {
                         tags.Add(value);
+                        if (value.StartsWith("license:", StringComparison.OrdinalIgnoreCase))
+                            license = value["license:".Length..];
+                    }
+
+            // HF publishes a total param count for safetensors models under "safetensors.total".
+            if (root.TryGetProperty("safetensors", out var st) && st.ValueKind == JsonValueKind.Object
+                && st.TryGetProperty("total", out var total) && total.TryGetInt64(out var count) && count > 0)
+                parameters = count;
+
+            if (root.TryGetProperty("pipeline_tag", out var pt) && pt.ValueKind == JsonValueKind.String)
+                pipeline = pt.GetString();
+
+            if (root.TryGetProperty("downloads", out var dl) && dl.TryGetInt64(out var dcount))
+                downloads = dcount;
+
+            // "gated" is false, "auto", or "manual" — any non-false value means access is gated.
+            if (root.TryGetProperty("gated", out var g))
+                gated = g.ValueKind == JsonValueKind.True
+                    || (g.ValueKind == JsonValueKind.String && !string.Equals(g.GetString(), "false", StringComparison.OrdinalIgnoreCase));
+
+            // cardData.license wins over a license:* tag when present.
+            if (root.TryGetProperty("cardData", out var card) && card.ValueKind == JsonValueKind.Object
+                && card.TryGetProperty("license", out var lic) && lic.ValueKind == JsonValueKind.String)
+                license = lic.GetString();
         }
         catch (JsonException)
         {
             // A malformed body just yields an empty probe → "no safetensors/config" verdict.
         }
 
-        return (files, tags);
+        return new HfApiMeta(files, tags, parameters, pipeline, license, gated, downloads);
     }
 }

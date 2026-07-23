@@ -48,16 +48,21 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         _host = host;
         LoadFromConfig();
         RefreshProfiles();
+        RefreshPlatformOptions();
         _host.Profiles.Changed += OnProfilesChanged;
+        _host.Platforms.Changed += OnPlatformsChanged;
     }
 
     // Profiles (named settings files). The dropdown selects the active profile; the editor below
     // always edits whichever profile is active.
     public ObservableCollection<string> Profiles { get; } = [];
     [ObservableProperty] private string? _selectedProfile;
-    [ObservableProperty] private string _newProfileName = "";
+    [ObservableProperty] private string _profileNameEdit = "";
     [ObservableProperty] private bool _deleteArmed;
     private bool _syncingProfiles;
+
+    /// <summary>Folder where the profile .json files live (for the "Open folder" button).</summary>
+    public string ProfilesFolder => _host.Paths.ProfilesDir;
 
     private void RefreshProfiles()
     {
@@ -66,6 +71,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         foreach (var name in _host.Profiles.Profiles)
             Profiles.Add(name);
         SelectedProfile = _host.Profiles.Active;
+        ProfileNameEdit = _host.Profiles.Active;
         _syncingProfiles = false;
     }
 
@@ -73,6 +79,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     {
         RefreshProfiles();
         LoadFromConfig();       // the active config changed under us — reload the editor
+        RefreshPlatformOptions();
         DeleteArmed = false;
     }
 
@@ -85,19 +92,16 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         StatusText = $"Switched to profile '{_host.Profiles.Active}'.";
     }
 
+    /// <summary>Auto name for new/duplicated profiles: New-Profile-YYYYMMDD-HHMMSS.</summary>
+    private static string NewProfileName() => $"New-Profile-{DateTime.Now:yyyyMMdd-HHmmss}";
+
     [RelayCommand]
     private void CreateProfile()
     {
-        if (!ProfileStore.IsValidName(NewProfileName))
-        {
-            StatusText = "Enter a valid profile name first.";
-            return;
-        }
         try
         {
-            _host.Profiles.Create(NewProfileName);
-            NewProfileName = "";
-            StatusText = $"Created profile '{_host.Profiles.Active}' from defaults.";
+            _host.Profiles.Create(NewProfileName());
+            StatusText = $"Created profile '{_host.Profiles.Active}' from defaults — rename it on the left.";
         }
         catch (Exception ex)
         {
@@ -108,16 +112,29 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     [RelayCommand]
     private void DuplicateProfile()
     {
-        if (!ProfileStore.IsValidName(NewProfileName))
+        try
         {
-            StatusText = "Enter a name for the duplicate first.";
+            _host.Profiles.Duplicate(NewProfileName());
+            StatusText = $"Duplicated into '{_host.Profiles.Active}' — rename it on the left.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = ex.Message;
+        }
+    }
+
+    [RelayCommand]
+    private void RenameProfile()
+    {
+        if (!ProfileStore.IsValidName(ProfileNameEdit))
+        {
+            StatusText = "Enter a valid profile name.";
             return;
         }
         try
         {
-            _host.Profiles.Duplicate(NewProfileName);
-            NewProfileName = "";
-            StatusText = $"Duplicated into '{_host.Profiles.Active}'.";
+            _host.Profiles.Rename(ProfileNameEdit);
+            StatusText = $"Renamed to '{_host.Profiles.Active}'.";
         }
         catch (Exception ex)
         {
@@ -163,7 +180,6 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     [ObservableProperty] private string _kvCacheDtype = "auto";
     [ObservableProperty] private bool _enableToolCalling = true;
     [ObservableProperty] private string _toolCallParser = "hermes";
-    [ObservableProperty] private string _hfToken = "";
     [ObservableProperty] private string _extraVllmArgs = "";
     [ObservableProperty] private string _extraContainerArgs = "";
 
@@ -197,15 +213,43 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     [ObservableProperty] private string _gpuHint = "Viewing this tab lists your GPUs.";
     [ObservableProperty] private string _nvLinkHint = "";
 
-    // Images
-    [ObservableProperty] private string _gpuImage = "";
-    [ObservableProperty] private string _cpuImage = "";
+    // Platform — which platform (container images + distro source) this profile uses. Edited on
+    // the Platform tab; here you only pick one (or leave it on the default).
+    public const string DefaultPlatformOption = "(Default)";
+    public ObservableCollection<string> PlatformOptions { get; } = [];
+    [ObservableProperty] private string? _selectedPlatformOption;
+    private bool _syncingPlatform;
 
-    // Distro
-    [ObservableProperty] private bool _useWslCatalog = true;
-    [ObservableProperty] private string _catalogDistroName = "";
-    [ObservableProperty] private string _rootfsUrl = "";
-    [ObservableProperty] private string _rootfsChecksumUrl = "";
+    private void RefreshPlatformOptions()
+    {
+        _syncingPlatform = true;
+        PlatformOptions.Clear();
+        PlatformOptions.Add(DefaultPlatformOption);
+        foreach (var name in _host.Platforms.Platforms)
+            PlatformOptions.Add(name);
+        var selected = _host.Platforms.SelectedForProfile;
+        SelectedPlatformOption = string.IsNullOrWhiteSpace(selected) || !PlatformOptions.Contains(selected)
+            ? DefaultPlatformOption
+            : selected;
+        _syncingPlatform = false;
+    }
+
+    partial void OnSelectedPlatformOptionChanged(string? value)
+    {
+        if (_syncingPlatform || value is null)
+            return;
+        _host.Platforms.SelectForProfile(value == DefaultPlatformOption ? "" : value);
+        UpdatePreview();
+        StatusText = value == DefaultPlatformOption
+            ? $"Using the default platform ('{_host.Platforms.Default}')."
+            : $"Using platform '{value}'.";
+    }
+
+    private void OnPlatformsChanged()
+    {
+        RefreshPlatformOptions();
+        UpdatePreview();
+    }
 
     // Network / behavior
     [ObservableProperty] private string _proxy = "";
@@ -221,7 +265,8 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         base.OnPropertyChanged(e);
         if (!_loading && e.PropertyName is not (nameof(CommandPreview) or nameof(PreviewLabel) or nameof(StatusText)
                 or nameof(ModelAdvisory) or nameof(HasModelAdvisory)
-                or nameof(SelectedProfile) or nameof(NewProfileName) or nameof(DeleteArmed)))
+                or nameof(SelectedProfile) or nameof(ProfileNameEdit) or nameof(DeleteArmed)
+                or nameof(SelectedPlatformOption)))
             UpdatePreview();
     }
 
@@ -319,18 +364,9 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         KvCacheDtype = string.IsNullOrWhiteSpace(config.Server.KvCacheDtype) ? "auto" : config.Server.KvCacheDtype;
         EnableToolCalling = config.Server.EnableToolCalling;
         ToolCallParser = config.Server.ToolCallParser;
-        HfToken = config.Server.HfToken ?? "";
         ExtraVllmArgs = string.Join(Environment.NewLine, config.Server.ExtraArgs);
         ExtraContainerArgs = string.Join(Environment.NewLine, config.Server.ExtraContainerArgs);
 
-        GpuImage = config.Images.Gpu;
-        CpuImage = config.Images.Cpu;
-
-        UseWslCatalog = !config.Distro.UsesTarball;
-        CatalogDistroName = config.Distro.OnlineName;
-        var rootfs = config.Artifacts.TryGetValue("rootfs", out var source) ? source : new ArtifactSource();
-        RootfsUrl = rootfs.Url ?? "";
-        RootfsChecksumUrl = rootfs.ChecksumUrl ?? "";
 
         Proxy = config.Network.Proxy ?? "";
         AllowSystemProxy = config.Network.AllowSystemProxy;
@@ -375,20 +411,9 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         config.Server.VisibleGpus = ComposeVisibleGpus();
         config.Server.CudaDeviceOrder = ComposeDeviceOrder();
         config.Server.DisableGpuP2P = DisableGpuP2P;
-        config.Server.HfToken = string.IsNullOrWhiteSpace(HfToken) ? null : HfToken.Trim();
         config.Server.ExtraArgs = SplitArgs(ExtraVllmArgs);
         config.Server.ExtraContainerArgs = SplitArgs(ExtraContainerArgs);
-
-        config.Images.Gpu = GpuImage.Trim();
-        config.Images.Cpu = CpuImage.Trim();
-
-        config.Distro.Source = UseWslCatalog ? DistroConfig.SourceWslOnline : DistroConfig.SourceTarball;
-        config.Distro.OnlineName = CatalogDistroName.Trim();
-        config.Artifacts["rootfs"] = new ArtifactSource
-        {
-            Url = string.IsNullOrWhiteSpace(RootfsUrl) ? null : RootfsUrl.Trim(),
-            ChecksumUrl = string.IsNullOrWhiteSpace(RootfsChecksumUrl) ? null : RootfsChecksumUrl.Trim(),
-        };
+        // Images/Distro are resolved from the selected platform (see the Platform tab), not saved here.
 
         config.Network.Proxy = string.IsNullOrWhiteSpace(Proxy) ? null : Proxy.Trim();
         config.Network.AllowSystemProxy = AllowSystemProxy;
@@ -432,11 +457,12 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
                 VisibleGpus = ComposeVisibleGpus(),
                 CudaDeviceOrder = ComposeDeviceOrder(),
                 DisableGpuP2P = DisableGpuP2P,
-                HfToken = string.IsNullOrWhiteSpace(HfToken) ? null : "***",
+                HfToken = string.IsNullOrWhiteSpace(_host.Config.Server.HfToken) ? null : "***",
                 ExtraArgs = SplitArgs(ExtraVllmArgs),
                 ExtraContainerArgs = SplitArgs(ExtraContainerArgs),
             },
-            Images = new ImagesConfig { Gpu = GpuImage.Trim(), Cpu = CpuImage.Trim() },
+            // Images come from the resolved platform (kept current by PlatformManager.Apply).
+            Images = _host.Config.Images,
             Network = new NetworkConfig { Proxy = string.IsNullOrWhiteSpace(Proxy) ? null : Proxy.Trim() },
         };
 

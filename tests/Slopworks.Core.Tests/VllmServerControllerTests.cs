@@ -283,6 +283,14 @@ public class VllmServerControllerTests
         => Assert.Equal(expected, ModelId.Normalize(input));
 
     [Fact]
+    public void ModelId_ToleratesNull()
+    {
+        // A ComboBox can transiently write null into the bound model while its items rebuild.
+        Assert.Equal("", ModelId.Normalize(null));
+        Assert.Null(ModelId.Advisory(null));
+    }
+
+    [Fact]
     public void BuildRunCommand_NormalizesPastedHfCoPrefix()
     {
         var command = Build(new SlopworksConfig()).BuildRunCommand(GpuProfile, "hf.co/org/model");

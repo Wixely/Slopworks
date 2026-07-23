@@ -11,9 +11,9 @@ public static class ModelId
     /// HuggingFace validation rejects: "Repo id must be in the form namespace/repo_name".
     /// Leaves a plain "namespace/name" (or "namespace/name:tag") untouched otherwise.
     /// </summary>
-    public static string Normalize(string model)
+    public static string Normalize(string? model)
     {
-        var cleaned = model.Trim();
+        var cleaned = (model ?? string.Empty).Trim();
 
         foreach (var scheme in new[] { "https://", "http://" })
         {
@@ -31,7 +31,7 @@ public static class ModelId
     }
 
     /// <summary>A one-line caution when the id looks Ollama/GGUF-shaped, else null.</summary>
-    public static string? Advisory(string model)
+    public static string? Advisory(string? model)
     {
         var cleaned = Normalize(model);
 

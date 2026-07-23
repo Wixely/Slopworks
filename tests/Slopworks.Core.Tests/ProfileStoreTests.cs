@@ -62,6 +62,40 @@ public class ProfileStoreTests
     }
 
     [Fact]
+    public void Rename_MovesFile_KeepsContent_AndUpdatesActivePointer()
+    {
+        var (store, dir) = NewStore();
+        try
+        {
+            var config = new SlopworksConfig();
+            config.Server.Model = "org/keep-me";
+            store.Create("old", config);
+            store.SetActive("old");
+
+            store.Rename("old", "New Name");
+
+            Assert.DoesNotContain("old", store.List());
+            Assert.Contains("New Name", store.List());
+            Assert.Equal("New Name", store.Active);
+            Assert.Equal("org/keep-me", store.Load("New Name").Server.Model);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void Rename_ToExistingName_Throws()
+    {
+        var (store, dir) = NewStore();
+        try
+        {
+            store.Create("a", new SlopworksConfig());
+            store.Create("b", new SlopworksConfig());
+            Assert.Throws<InvalidOperationException>(() => store.Rename("a", "b"));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void Delete_RemovesTheProfile()
     {
         var (store, dir) = NewStore();

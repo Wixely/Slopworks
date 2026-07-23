@@ -76,6 +76,38 @@ public sealed class ProfileStore(SlopworksPaths paths)
 
     public string Duplicate(string source, string newName) => Create(newName, Load(source));
 
+    /// <summary>Rename a profile's file (and the active pointer if it pointed at it). Returns the clean name.</summary>
+    public string Rename(string oldName, string newName)
+    {
+        var clean = Clean(newName);
+        if (clean.Length == 0)
+            throw new ArgumentException("Profile name cannot be empty.");
+        if (!Exists(oldName))
+            throw new InvalidOperationException($"No profile named '{oldName}'.");
+        if (clean.Equals(oldName, StringComparison.Ordinal))
+            return clean; // no change
+
+        var caseOnly = clean.Equals(oldName, StringComparison.OrdinalIgnoreCase);
+        if (!caseOnly && Exists(clean))
+            throw new InvalidOperationException($"A profile named '{clean}' already exists.");
+
+        if (caseOnly)
+        {
+            // A case-only rename on a case-insensitive filesystem needs a two-step move.
+            var temp = Path.Combine(paths.ProfilesDir, clean + ".rename.tmp");
+            File.Move(PathFor(oldName), temp);
+            File.Move(temp, PathFor(clean));
+        }
+        else
+        {
+            File.Move(PathFor(oldName), PathFor(clean));
+        }
+
+        if (string.Equals(Active, oldName, StringComparison.OrdinalIgnoreCase))
+            SetActive(clean);
+        return clean;
+    }
+
     public void Delete(string name)
     {
         var file = PathFor(name);

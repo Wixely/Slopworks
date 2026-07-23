@@ -19,6 +19,12 @@ public sealed class SlopworksPaths(string root)
     /// <summary>Records which profile name is currently active.</summary>
     public string ActiveProfileFile => Path.Combine(ProfilesDir, "active.txt");
 
+    /// <summary>Named platform files (container images + distro source).</summary>
+    public string PlatformsDir => Path.Combine(Root, "platforms");
+
+    /// <summary>Records which platform is the default (used by profiles that don't pick one).</summary>
+    public string DefaultPlatformFile => Path.Combine(PlatformsDir, "default.txt");
+
     public string StateDir => Path.Combine(Root, "state");
     public string JournalFile => Path.Combine(StateDir, "journal.json");
     public string SmokeDir => Path.Combine(StateDir, "smoke");
@@ -32,7 +38,7 @@ public sealed class SlopworksPaths(string root)
 
     public void EnsureCreated()
     {
-        foreach (var dir in new[] { Root, ProfilesDir, StateDir, SmokeDir, ElevatedDir, RootfsDir, WslDir, LogsDir, VllmLogsDir })
+        foreach (var dir in new[] { Root, ProfilesDir, PlatformsDir, StateDir, SmokeDir, ElevatedDir, RootfsDir, WslDir, LogsDir, VllmLogsDir })
             Directory.CreateDirectory(dir);
     }
 

@@ -23,7 +23,7 @@
 
         <StackPanel Spacing="8">
           <TextBlock Text="vLLM server" FontWeight="SemiBold" FontSize="16" />
-          <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" >
+          <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" >
             <TextBlock Grid.Row="0" Text="Port" VerticalAlignment="Center" />
             <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Port}" Margin="0,2" />
             <TextBlock Grid.Row="1" Text="Model (HuggingFace id)" VerticalAlignment="Center" />
@@ -40,16 +40,14 @@
                        ToolTip.Tip="VLLM_LOGGING_LEVEL. DEBUG is the most verbose — use it to see request detail when diagnosing 400s. Restart the server after changing." />
             <ComboBox Grid.Row="3" Grid.Column="1" MinWidth="160" Margin="0,2"
                       ItemsSource="{Binding LogLevelOptions}" SelectedItem="{Binding VllmLogLevel}" />
-            <TextBlock Grid.Row="4" Text="HuggingFace token" VerticalAlignment="Center" />
-            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding HfToken}" PasswordChar="•" Margin="0,2" />
-            <TextBlock Grid.Row="5" Text="Extra vLLM arguments" VerticalAlignment="Top" Margin="0,6,0,0"
+            <TextBlock Grid.Row="4" Text="Extra vLLM arguments" VerticalAlignment="Top" Margin="0,6,0,0"
                        ToolTip.Tip="Appended after --model. One argument per line, e.g. --max-model-len 8192" />
-            <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding ExtraVllmArgs}" AcceptsReturn="True"
+            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding ExtraVllmArgs}" AcceptsReturn="True"
                      MinHeight="56" FontFamily="Consolas,Menlo,monospace" FontSize="12" Margin="0,2"
                      PlaceholderText="--max-model-len 8192&#x0a;--dtype float16" />
-            <TextBlock Grid.Row="6" Text="Extra container arguments" VerticalAlignment="Top" Margin="0,6,0,0"
+            <TextBlock Grid.Row="5" Text="Extra container arguments" VerticalAlignment="Top" Margin="0,6,0,0"
                        ToolTip.Tip="Podman flags inserted before the image. One per line, e.g. --memory 24g" />
-            <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding ExtraContainerArgs}" AcceptsReturn="True"
+            <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding ExtraContainerArgs}" AcceptsReturn="True"
                      MinHeight="56" FontFamily="Consolas,Menlo,monospace" FontSize="12" Margin="0,2"
                      PlaceholderText="--memory 24g" />
           </Grid>
@@ -120,27 +118,14 @@
         </StackPanel>
 
         <StackPanel Spacing="8">
-          <TextBlock Text="Container images" FontWeight="SemiBold" FontSize="16" />
-          <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto">
-            <TextBlock Grid.Row="0" Text="GPU image" VerticalAlignment="Center" />
-            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding GpuImage}" Margin="0,2" />
-            <TextBlock Grid.Row="1" Text="CPU image" VerticalAlignment="Center" />
-            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CpuImage}" Margin="0,2" />
-          </Grid>
-        </StackPanel>
-
-        <StackPanel Spacing="8">
-          <TextBlock Text="Distro source" FontWeight="SemiBold" FontSize="16" />
-          <ToggleSwitch IsChecked="{Binding UseWslCatalog}"
-                        OnContent="Official WSL catalog" OffContent="Custom rootfs tarball" />
-          <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto">
-            <TextBlock Grid.Row="0" Text="Catalog distro name" VerticalAlignment="Center"
-                       ToolTip.Tip="As listed by: wsl --list --online" />
-            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CatalogDistroName}" Margin="0,2" />
-            <TextBlock Grid.Row="1" Text="Rootfs URL (tarball mode)" VerticalAlignment="Center" />
-            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding RootfsUrl}" Margin="0,2" />
-            <TextBlock Grid.Row="2" Text="Checksum URL (tarball mode)" VerticalAlignment="Center" />
-            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding RootfsChecksumUrl}" Margin="0,2" />
+          <TextBlock Text="Platform" FontWeight="SemiBold" FontSize="16" />
+          <TextBlock Text="Container images + distro source come from a platform. Edit platforms on the Platform tab; here you just pick which one this profile uses."
+                     FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+          <Grid ColumnDefinitions="220,*">
+            <TextBlock Text="Platform" VerticalAlignment="Center"
+                       ToolTip.Tip="(Default) uses whichever platform is marked default on the Platform tab." />
+            <ComboBox Grid.Column="1" MinWidth="240" Margin="0,2" HorizontalAlignment="Left"
+                      ItemsSource="{Binding PlatformOptions}" SelectedItem="{Binding SelectedPlatformOption}" />
           </Grid>
         </StackPanel>
 
@@ -172,21 +157,27 @@
       <Border Grid.Column="2" Background="#14000000" CornerRadius="8" Padding="12">
         <Grid RowDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto">
           <TextBlock Grid.Row="0" Text="Profiles" FontWeight="SemiBold" FontSize="16" />
-          <TextBlock Grid.Row="1" Text="Named settings files. Click one to make it active; the settings on the left edit it."
+          <TextBlock Grid.Row="1" Text="Named settings files. Click one to use it, then edit its name below. The settings on the left edit the selected profile."
                      FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,2,0,8" />
           <ListBox Grid.Row="2" MinHeight="140" ItemsSource="{Binding Profiles}"
                    SelectedItem="{Binding SelectedProfile}" />
-          <TextBox Grid.Row="3" Text="{Binding NewProfileName}" Margin="0,8,0,0"
-                   PlaceholderText="new profile name" />
-          <Button Grid.Row="4" Content="Create new" Command="{Binding CreateProfileCommand}"
-                  HorizontalAlignment="Stretch" Margin="0,6,0,0"
-                  ToolTip.Tip="Create a new profile from default settings and switch to it" />
-          <Button Grid.Row="5" Content="Duplicate current" Command="{Binding DuplicateProfileCommand}"
-                  HorizontalAlignment="Stretch" Margin="0,6,0,0"
-                  ToolTip.Tip="Copy the active profile under the new name and switch to it" />
-          <Button Grid.Row="6" Content="Delete" Command="{Binding DeleteProfileCommand}"
+          <DockPanel Grid.Row="3" Margin="0,8,0,0">
+            <Button DockPanel.Dock="Right" Content="Rename" Command="{Binding RenameProfileCommand}" Margin="8,0,0,0"
+                    ToolTip.Tip="Rename the selected profile" />
+            <TextBox Text="{Binding ProfileNameEdit}" ToolTip.Tip="Edit the selected profile's name, then press Rename" />
+          </DockPanel>
+          <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="6" Margin="0,6,0,0">
+            <Button Content="New" Command="{Binding CreateProfileCommand}"
+                    ToolTip.Tip="Create a new profile from default settings (auto-named — rename it above)" />
+            <Button Content="Duplicate" Command="{Binding DuplicateProfileCommand}"
+                    ToolTip.Tip="Copy the active profile (auto-named — rename it above)" />
+          </StackPanel>
+          <Button Grid.Row="5" Content="Delete" Command="{Binding DeleteProfileCommand}"
                   HorizontalAlignment="Stretch" Margin="0,6,0,0"
                   ToolTip.Tip="Delete the active profile — press twice to confirm" />
+          <Button Grid.Row="6" Content="Open profiles folder" Click="OpenProfilesFolder_Click"
+                  HorizontalAlignment="Stretch" Margin="0,6,0,0"
+                  ToolTip.Tip="Open the folder containing the profile .json files" />
         </Grid>
       </Border>
     </Grid>

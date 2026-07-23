@@ -65,6 +65,15 @@ public sealed class ProfileManager
         return created;
     }
 
+    /// <summary>Rename the active profile.</summary>
+    public string Rename(string newName)
+    {
+        _store.Save(Active, _config); // flush pending edits before the file moves
+        var renamed = _store.Rename(Active, newName);
+        Changed?.Invoke();
+        return renamed;
+    }
+
     /// <summary>Delete a profile. If it was active, fall back to another (or a fresh default).</summary>
     public void Delete(string name)
     {

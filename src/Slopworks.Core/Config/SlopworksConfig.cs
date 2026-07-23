@@ -23,6 +23,12 @@ public sealed class SlopworksConfig
     /// </summary>
     public List<string> Forces { get; set; } = [];
 
+    /// <summary>
+    /// Which platform (container images + distro source) this profile uses. Empty = the default
+    /// platform. Images/Distro below are the resolved values for that platform (see PlatformManager).
+    /// </summary>
+    public string Platform { get; set; } = "";
+
     public ServerConfig Server { get; set; } = new();
     public ImagesConfig Images { get; set; } = new();
     public DistroConfig Distro { get; set; } = new();
@@ -47,6 +53,7 @@ public sealed class SlopworksConfig
         AutoApproveInsideRoot = other.AutoApproveInsideRoot;
         Bypasses = other.Bypasses;
         Forces = other.Forces;
+        Platform = other.Platform;
         Server = other.Server;
         Images = other.Images;
         Distro = other.Distro;
