@@ -142,11 +142,18 @@ public sealed class ProfileStore(SlopworksPaths paths)
 
     private string PathFor(string name) => Path.Combine(paths.ProfilesDir, Clean(name) + ".json");
 
+    // The characters illegal in a Windows filename, plus the path separators. We strip this fixed
+    // set rather than Path.GetInvalidFileNameChars() because that method is OS-dependent (Linux only
+    // forbids '/' and NUL), which would make a name like "a:b" clean to "ab" on Windows but "a:b" on
+    // Linux. Profile files must be valid on Windows — the strictest platform — and clean identically
+    // everywhere so a profile round-trips across OSes.
+    private static readonly char[] UnsafeChars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
+
     /// <summary>Reduce a display name to a safe file base (drops path/invalid chars; keeps inner dots).</summary>
     public static string Clean(string name)
     {
         var trimmed = (name ?? "").Trim();
-        var kept = new string([.. trimmed.Where(c => !Path.GetInvalidFileNameChars().Contains(c))]);
+        var kept = new string([.. trimmed.Where(c => !UnsafeChars.Contains(c) && !char.IsControl(c))]);
         // Trim leading/trailing dots (Windows strips trailing dots from filenames; leading dot hides on Linux)
         // but keep inner ones so "v1.2" stays intact.
         return kept.Trim().Trim('.').Trim();
