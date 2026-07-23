@@ -36,6 +36,9 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
     private DispatcherTimer? _logTimer;
     private bool _pollInFlight;
 
+    // Remembered "live logs on" preference (global, defaults to on).
+    private bool _liveLogsPref = UiPrefsStore.Load(host.Paths).LiveLogs;
+
     public string LiveLogsLabel => IsLiveLogging ? "Stop live logs" : "Live logs";
 
     partial void OnIsLiveLoggingChanged(bool value) => OnPropertyChanged(nameof(LiveLogsLabel));
@@ -365,16 +368,24 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
             UpdateNetworkStatus(actuallyEnabled, host.Config.Server.Port);
         });
 
-    /// <summary>Toggles a live tail that polls the container log every 2s and persists it.</summary>
+    /// <summary>Toggles a live tail that polls the container log every 2s; the choice is remembered.</summary>
     [RelayCommand]
     private void ToggleLiveLogs()
     {
         if (IsLiveLogging)
-        {
             StopLiveLogs();
-            return;
-        }
+        else
+            StartLiveLogs();
 
+        // Remember the user's choice across restarts (on by default).
+        _liveLogsPref = IsLiveLogging;
+        UiPrefsStore.Save(host.Paths, new UiPrefs { LiveLogs = _liveLogsPref });
+    }
+
+    private void StartLiveLogs()
+    {
+        if (IsLiveLogging)
+            return;
         IsLiveLogging = true;
         _logTimer ??= CreateLogTimer();
         _ = PollLogsAsync(); // fetch immediately, then on each tick
@@ -424,6 +435,11 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
         UpdateCommandPreview();
         _ = EnsureProfileAsync();
         StartMetrics();
+
+        // Live logs default on and remember the last choice; Deactivate stops the timer without
+        // touching the preference, so returning to the tab restarts it when it was on.
+        if (_liveLogsPref)
+            StartLiveLogs();
     }
 
     public void Deactivate()
