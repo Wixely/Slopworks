@@ -103,6 +103,16 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
         if (config.Server.Quantization is { Length: > 0 } quant && !quant.Equals("auto", StringComparison.OrdinalIgnoreCase))
             args.Add($"--quantization {quant}");
 
+        // Context window. Unset = the model's own (often huge) maximum. Skip if the user already
+        // supplied it via extra args so we never pass a duplicate flag.
+        if (config.Server.MaxModelLen is { } maxLen && maxLen > 0
+            && !config.Server.ExtraArgs.Any(a => a.Contains("--max-model-len", StringComparison.OrdinalIgnoreCase)))
+            args.Add($"--max-model-len {maxLen}");
+
+        // KV cache quantization — fp8 roughly halves KV-cache VRAM. "auto" keeps the model dtype.
+        if (config.Server.KvCacheDtype is { Length: > 0 } kvDtype && !kvDtype.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            args.Add($"--kv-cache-dtype {kvDtype}");
+
         if (profile.GpuPresent)
         {
             args.Add($"--gpu-memory-utilization {config.Server.GpuMemoryUtilization:0.##}");

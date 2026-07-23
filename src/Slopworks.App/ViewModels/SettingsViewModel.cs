@@ -47,6 +47,101 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     {
         _host = host;
         LoadFromConfig();
+        RefreshProfiles();
+        _host.Profiles.Changed += OnProfilesChanged;
+    }
+
+    // Profiles (named settings files). The dropdown selects the active profile; the editor below
+    // always edits whichever profile is active.
+    public ObservableCollection<string> Profiles { get; } = [];
+    [ObservableProperty] private string? _selectedProfile;
+    [ObservableProperty] private string _newProfileName = "";
+    [ObservableProperty] private bool _deleteArmed;
+    private bool _syncingProfiles;
+
+    private void RefreshProfiles()
+    {
+        _syncingProfiles = true;
+        Profiles.Clear();
+        foreach (var name in _host.Profiles.Profiles)
+            Profiles.Add(name);
+        SelectedProfile = _host.Profiles.Active;
+        _syncingProfiles = false;
+    }
+
+    private void OnProfilesChanged()
+    {
+        RefreshProfiles();
+        LoadFromConfig();       // the active config changed under us — reload the editor
+        DeleteArmed = false;
+    }
+
+    partial void OnSelectedProfileChanged(string? value)
+    {
+        if (_syncingProfiles || value is null || value == _host.Profiles.Active)
+            return;
+        DeleteArmed = false;
+        _host.Profiles.Switch(value); // raises Changed → OnProfilesChanged reloads the editor
+        StatusText = $"Switched to profile '{_host.Profiles.Active}'.";
+    }
+
+    [RelayCommand]
+    private void CreateProfile()
+    {
+        if (!ProfileStore.IsValidName(NewProfileName))
+        {
+            StatusText = "Enter a valid profile name first.";
+            return;
+        }
+        try
+        {
+            _host.Profiles.Create(NewProfileName);
+            NewProfileName = "";
+            StatusText = $"Created profile '{_host.Profiles.Active}' from defaults.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = ex.Message;
+        }
+    }
+
+    [RelayCommand]
+    private void DuplicateProfile()
+    {
+        if (!ProfileStore.IsValidName(NewProfileName))
+        {
+            StatusText = "Enter a name for the duplicate first.";
+            return;
+        }
+        try
+        {
+            _host.Profiles.Duplicate(NewProfileName);
+            NewProfileName = "";
+            StatusText = $"Duplicated into '{_host.Profiles.Active}'.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = ex.Message;
+        }
+    }
+
+    [RelayCommand]
+    private void DeleteProfile()
+    {
+        if (Profiles.Count <= 1)
+        {
+            StatusText = "Can't delete the only profile — create another first.";
+            return;
+        }
+        if (!DeleteArmed)
+        {
+            DeleteArmed = true;
+            StatusText = $"Press Delete again to permanently remove '{_host.Profiles.Active}'.";
+            return;
+        }
+        var name = _host.Profiles.Active;
+        _host.Profiles.Delete(name);
+        StatusText = $"Deleted profile '{name}'.";
     }
 
     /// <summary>Probes the machine profile (for the live command preview) the first time the tab is viewed.</summary>
@@ -62,8 +157,10 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     [ObservableProperty] private string _port = "";
     [ObservableProperty] private string _model = "";
     [ObservableProperty] private string _gpuMemoryUtilization = "";
+    [ObservableProperty] private string _maxModelLen = "";
     [ObservableProperty] private string _vllmLogLevel = "INFO";
     [ObservableProperty] private string _quantization = "auto";
+    [ObservableProperty] private string _kvCacheDtype = "auto";
     [ObservableProperty] private bool _enableToolCalling = true;
     [ObservableProperty] private string _toolCallParser = "hermes";
     [ObservableProperty] private string _hfToken = "";
@@ -84,6 +181,8 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
 
     public IReadOnlyList<string> QuantizationOptions { get; } =
         ["auto", "awq", "gptq", "compressed-tensors", "fp8", "nvfp4", "modelopt_fp4", "bitsandbytes"];
+
+    public IReadOnlyList<string> KvCacheOptions { get; } = ["auto", "fp8", "fp8_e5m2"];
 
     // GPUs (populated from nvidia-smi when the tab is first viewed)
     public ObservableCollection<GpuCheckItemViewModel> Gpus { get; } = [];
@@ -121,7 +220,8 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     {
         base.OnPropertyChanged(e);
         if (!_loading && e.PropertyName is not (nameof(CommandPreview) or nameof(PreviewLabel) or nameof(StatusText)
-                or nameof(ModelAdvisory) or nameof(HasModelAdvisory)))
+                or nameof(ModelAdvisory) or nameof(HasModelAdvisory)
+                or nameof(SelectedProfile) or nameof(NewProfileName) or nameof(DeleteArmed)))
             UpdatePreview();
     }
 
@@ -213,8 +313,10 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         Port = config.Server.Port.ToString();
         Model = config.Server.Model;
         GpuMemoryUtilization = config.Server.GpuMemoryUtilization.ToString("0.##");
+        MaxModelLen = config.Server.MaxModelLen?.ToString() ?? "";
         VllmLogLevel = string.IsNullOrWhiteSpace(config.Server.VllmLogLevel) ? "INFO" : config.Server.VllmLogLevel;
         Quantization = string.IsNullOrWhiteSpace(config.Server.Quantization) ? "auto" : config.Server.Quantization;
+        KvCacheDtype = string.IsNullOrWhiteSpace(config.Server.KvCacheDtype) ? "auto" : config.Server.KvCacheDtype;
         EnableToolCalling = config.Server.EnableToolCalling;
         ToolCallParser = config.Server.ToolCallParser;
         HfToken = config.Server.HfToken ?? "";
@@ -253,7 +355,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     [RelayCommand]
     private void Save()
     {
-        if (!TryValidate(out var port, out var gpuMem, out var error))
+        if (!TryValidate(out var port, out var gpuMem, out var maxModelLen, out var error))
         {
             StatusText = error;
             return;
@@ -263,8 +365,10 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         config.Server.Port = port;
         config.Server.Model = Model.Trim();
         config.Server.GpuMemoryUtilization = gpuMem;
+        config.Server.MaxModelLen = maxModelLen;
         config.Server.VllmLogLevel = VllmLogLevel;
         config.Server.Quantization = string.IsNullOrWhiteSpace(Quantization) ? "auto" : Quantization;
+        config.Server.KvCacheDtype = string.IsNullOrWhiteSpace(KvCacheDtype) ? "auto" : KvCacheDtype;
         config.Server.EnableToolCalling = EnableToolCalling;
         config.Server.ToolCallParser = string.IsNullOrWhiteSpace(ToolCallParser) ? "hermes" : ToolCallParser.Trim();
         config.Server.TensorParallelSize = SelectedTensorParallel > 0 ? SelectedTensorParallel : 1;
@@ -291,7 +395,8 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         config.AutoApproveInsideRoot = AutoApproveInsideRoot;
 
         ConfigStore.Save(_host.Paths, config);
-        StatusText = "Saved. Restart the server (and re-run affected setup steps) to apply.";
+        _host.Profiles.SaveActive(); // mirror the edits into the active profile file
+        StatusText = $"Saved to profile '{_host.Profiles.Active}'. Restart the server to apply.";
     }
 
     [RelayCommand]
@@ -303,7 +408,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
 
     private void UpdatePreview()
     {
-        if (!TryValidate(out var port, out var gpuMem, out var error))
+        if (!TryValidate(out var port, out var gpuMem, out var maxModelLen, out var error))
         {
             CommandPreview = "";
             PreviewLabel = error;
@@ -317,8 +422,10 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
                 Port = port,
                 Model = Model.Trim(),
                 GpuMemoryUtilization = gpuMem,
+                MaxModelLen = maxModelLen,
                 VllmLogLevel = VllmLogLevel,
                 Quantization = string.IsNullOrWhiteSpace(Quantization) ? "auto" : Quantization,
+                KvCacheDtype = string.IsNullOrWhiteSpace(KvCacheDtype) ? "auto" : KvCacheDtype,
                 EnableToolCalling = EnableToolCalling,
                 ToolCallParser = string.IsNullOrWhiteSpace(ToolCallParser) ? "hermes" : ToolCallParser.Trim(),
                 TensorParallelSize = SelectedTensorParallel > 0 ? SelectedTensorParallel : 1,
@@ -340,9 +447,10 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
             : "Command this machine will run (CPU mode — no NVIDIA GPU detected):";
     }
 
-    private bool TryValidate(out int port, out double gpuMem, out string error)
+    private bool TryValidate(out int port, out double gpuMem, out int? maxModelLen, out string error)
     {
         gpuMem = 0.9;
+        maxModelLen = null;
         error = "";
 
         if (!int.TryParse(Port, out port) || port is < 1 or > 65535)
@@ -355,6 +463,16 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         {
             error = "GPU memory utilization must be between 0 and 1 (e.g. 0.9).";
             return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(MaxModelLen))
+        {
+            if (!int.TryParse(MaxModelLen.Trim(), out var len) || len <= 0)
+            {
+                error = "Context size must be a positive whole number (or blank for the model default).";
+                return false;
+            }
+            maxModelLen = len;
         }
 
         if (string.IsNullOrWhiteSpace(Model))

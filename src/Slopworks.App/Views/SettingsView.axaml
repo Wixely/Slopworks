@@ -17,8 +17,9 @@
                  MaxLines="2" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusText}" />
     </StackPanel>
 
-    <ScrollViewer Grid.Row="1">
-      <StackPanel Spacing="18" MaxWidth="760" HorizontalAlignment="Left">
+    <Grid Grid.Row="1" ColumnDefinitions="*,16,300">
+      <ScrollViewer Grid.Column="0">
+        <StackPanel Spacing="18">
 
         <StackPanel Spacing="8">
           <TextBlock Text="vLLM server" FontWeight="SemiBold" FontSize="16" />
@@ -54,10 +55,23 @@
           </Grid>
 
           <Grid ColumnDefinitions="220,*">
+            <TextBlock Text="Context size (max tokens)" VerticalAlignment="Center"
+                       ToolTip.Tip="vLLM --max-model-len. Blank = the model's full context, which can be huge (e.g. 262144) and needs a large KV cache. Lower it (e.g. 8192 or 16384) to cut VRAM use and fit a model. Restart the server to apply." />
+            <TextBox Grid.Column="1" Text="{Binding MaxModelLen}" Margin="0,2" PlaceholderText="model default (leave blank)" />
+          </Grid>
+
+          <Grid ColumnDefinitions="220,*">
             <TextBlock Text="Quantization" VerticalAlignment="Center"
-                       ToolTip.Tip="--quantization. auto = detect from the checkpoint / full precision. awq, gptq = pre-quantized 4-bit (works on Ampere 3090). nvfp4, modelopt_fp4, fp8 = Blackwell/Hopper (5090). bitsandbytes = quantize a full-precision model on the fly." />
+                       ToolTip.Tip="--quantization. Leave on auto: vLLM reads the method from the checkpoint. awq, gptq, nvfp4, modelopt_fp4, compressed-tensors REQUIRE a repo that is already quantized that way (setting them on a full model fails: 'Cannot find the config file for …') — for those, put the pre-quantized repo in Model and keep this on auto. bitsandbytes is the only on-the-fly option (quantizes a full model at load time, single-GPU only). fp8 = Hopper/Blackwell (5090)." />
             <ComboBox Grid.Column="1" MinWidth="220" Margin="0,2"
                       ItemsSource="{Binding QuantizationOptions}" SelectedItem="{Binding Quantization}" />
+          </Grid>
+
+          <Grid ColumnDefinitions="220,*">
+            <TextBlock Text="KV cache quantization" VerticalAlignment="Center"
+                       ToolTip.Tip="vLLM --kv-cache-dtype. auto = model dtype. fp8 (e4m3) roughly halves the KV-cache VRAM, so you can fit longer context or a bigger model; fp8_e5m2 trades precision for range. Pair with Context size for tight VRAM. Restart the server to apply." />
+            <ComboBox Grid.Column="1" MinWidth="220" Margin="0,2"
+                      ItemsSource="{Binding KvCacheOptions}" SelectedItem="{Binding KvCacheDtype}" />
           </Grid>
 
           <CheckBox IsChecked="{Binding EnableToolCalling}"
@@ -152,7 +166,29 @@
                      FontSize="11" Opacity="0.55" />
         </StackPanel>
 
-      </StackPanel>
-    </ScrollViewer>
+        </StackPanel>
+      </ScrollViewer>
+
+      <Border Grid.Column="2" Background="#14000000" CornerRadius="8" Padding="12">
+        <Grid RowDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto">
+          <TextBlock Grid.Row="0" Text="Profiles" FontWeight="SemiBold" FontSize="16" />
+          <TextBlock Grid.Row="1" Text="Named settings files. Click one to make it active; the settings on the left edit it."
+                     FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,2,0,8" />
+          <ListBox Grid.Row="2" MinHeight="140" ItemsSource="{Binding Profiles}"
+                   SelectedItem="{Binding SelectedProfile}" />
+          <TextBox Grid.Row="3" Text="{Binding NewProfileName}" Margin="0,8,0,0"
+                   PlaceholderText="new profile name" />
+          <Button Grid.Row="4" Content="Create new" Command="{Binding CreateProfileCommand}"
+                  HorizontalAlignment="Stretch" Margin="0,6,0,0"
+                  ToolTip.Tip="Create a new profile from default settings and switch to it" />
+          <Button Grid.Row="5" Content="Duplicate current" Command="{Binding DuplicateProfileCommand}"
+                  HorizontalAlignment="Stretch" Margin="0,6,0,0"
+                  ToolTip.Tip="Copy the active profile under the new name and switch to it" />
+          <Button Grid.Row="6" Content="Delete" Command="{Binding DeleteProfileCommand}"
+                  HorizontalAlignment="Stretch" Margin="0,6,0,0"
+                  ToolTip.Tip="Delete the active profile — press twice to confirm" />
+        </Grid>
+      </Border>
+    </Grid>
   </Grid>
 </UserControl>

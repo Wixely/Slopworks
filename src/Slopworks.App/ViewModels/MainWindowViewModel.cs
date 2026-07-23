@@ -8,6 +8,7 @@ public partial class MainWindowViewModel : ObservableObject
     // Tab order in MainWindow.axaml.
     private const int DashboardTab = 0;
     private const int ServerTab = 2;
+    private const int SettingsTab = 5;
 
     public DashboardViewModel Dashboard { get; }
     public SetupWizardViewModel Wizard { get; }
@@ -35,6 +36,9 @@ public partial class MainWindowViewModel : ObservableObject
         // Set the backing field directly so we can activate the initial tab explicitly.
         _selectedTabIndex = SetupState.IsComplete(host.Journal) ? ServerTab : DashboardTab;
         (TabAt(_selectedTabIndex) as IActivatableTab)?.Activate();
+
+        // The System page's "Edit" button jumps here to the Settings tab.
+        host.Profiles.EditRequested += () => SelectedTabIndex = SettingsTab;
     }
 
     partial void OnSelectedTabIndexChanged(int oldValue, int newValue)

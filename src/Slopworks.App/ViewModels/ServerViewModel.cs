@@ -118,6 +118,36 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
         _ => new SolidColorBrush(Color.Parse("#9AA0A6")),                        // gray
     };
 
+    // Active settings profile — this dropdown switches it; the editor lives on the Settings tab.
+    public ObservableCollection<string> Profiles { get; } = [];
+    [ObservableProperty] private string? _selectedProfile;
+    private bool _syncingProfiles;
+
+    private void RefreshProfiles()
+    {
+        _syncingProfiles = true;
+        Profiles.Clear();
+        foreach (var name in host.Profiles.Profiles)
+            Profiles.Add(name);
+        SelectedProfile = host.Profiles.Active;
+        _syncingProfiles = false;
+    }
+
+    partial void OnSelectedProfileChanged(string? value)
+    {
+        if (_syncingProfiles || value is null || value == host.Profiles.Active)
+            return;
+        host.Profiles.Switch(value);
+        // Reflect the switched-in profile in this tab's fields.
+        Model = host.Config.Server.Model;
+        HfToken = host.Config.Server.HfToken ?? "";
+        StatusText = $"Switched to profile '{host.Profiles.Active}'.";
+    }
+
+    /// <summary>Jump to the Settings tab to edit the active profile.</summary>
+    [RelayCommand]
+    private void EditProfile() => host.Profiles.RequestEdit();
+
     private IProcessRunner Runner => new RecordingProcessRunner(
         host.ProcessRunner, host.CommandLog, "server-ui", "user-click");
 
@@ -203,6 +233,22 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
         });
 
     [RelayCommand]
+    private async Task RestartAsync()
+    {
+        SaveConfig(); // apply current model/settings on the way back up
+        await RunBusyAsync(async () =>
+        {
+            StatusText = "Restarting…";
+            await host.Server.StopAsync(Runner, null, CancellationToken.None);
+            var profile = await host.SystemInfo.GetProfileAsync(CancellationToken.None);
+            var result = await host.Server.StartAsync(Runner, profile, Model, null, CancellationToken.None);
+            StatusText = result.Succeeded
+                ? "Restarted — first model load can take several minutes. Refresh to watch it come up."
+                : $"Restart failed: {(result.Stderr + result.Stdout).Trim()}";
+        });
+    }
+
+    [RelayCommand]
     private async Task RefreshAsync()
         => await RunBusyAsync(async () =>
         {
@@ -273,6 +319,11 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
     // IActivatableTab: stop polling when the user leaves the Server tab.
     public void Activate()
     {
+        // The active profile may have changed on the Settings tab while we were away — re-sync the
+        // dropdown and fields so Start/Restart don't write a stale model over the switched-in profile.
+        RefreshProfiles();
+        Model = host.Config.Server.Model;
+        HfToken = host.Config.Server.HfToken ?? "";
     }
 
     public void Deactivate() => StopLiveLogs();
@@ -292,6 +343,7 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
         host.Config.Server.Model = Model.Trim();
         host.Config.Server.HfToken = string.IsNullOrWhiteSpace(HfToken) ? null : HfToken.Trim();
         ConfigStore.Save(host.Paths, host.Config);
+        host.Profiles.SaveActive(); // keep the active profile file in sync with Server-tab edits
     }
 
     private async Task RunBusyAsync(Func<Task> work)

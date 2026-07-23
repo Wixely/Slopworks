@@ -302,6 +302,59 @@ public class VllmServerControllerTests
         => Assert.Equal(expectWarning, ModelId.Advisory(input) is not null);
 
     [Fact]
+    public void MaxModelLen_WhenSet_AddsTheFlag()
+    {
+        var config = new SlopworksConfig();
+        config.Server.MaxModelLen = 8192;
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains("--max-model-len 8192", command);
+    }
+
+    [Fact]
+    public void MaxModelLen_Unset_OmitsTheFlag()
+    {
+        var command = Build(new SlopworksConfig()).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.DoesNotContain("--max-model-len", command);
+    }
+
+    [Fact]
+    public void MaxModelLen_DefersToExtraArgs_NoDuplicateFlag()
+    {
+        var config = new SlopworksConfig();
+        config.Server.MaxModelLen = 8192;
+        config.Server.ExtraArgs = ["--max-model-len 4096"]; // user's explicit value wins
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains("--max-model-len 4096", command);
+        Assert.DoesNotContain("--max-model-len 8192", command);
+    }
+
+    [Theory]
+    [InlineData("fp8")]
+    [InlineData("fp8_e5m2")]
+    public void KvCacheDtype_WhenSet_AddsTheFlag(string dtype)
+    {
+        var config = new SlopworksConfig();
+        config.Server.KvCacheDtype = dtype;
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains($"--kv-cache-dtype {dtype}", command);
+    }
+
+    [Fact]
+    public void KvCacheDtype_Auto_OmitsTheFlag()
+    {
+        var command = Build(new SlopworksConfig()).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.DoesNotContain("--kv-cache-dtype", command);
+    }
+
+    [Fact]
     public void HfToken_NeverAppearsInTheCommandLine()
     {
         var config = new SlopworksConfig();

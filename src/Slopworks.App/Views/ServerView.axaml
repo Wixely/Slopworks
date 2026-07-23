@@ -6,7 +6,16 @@
   <Grid Margin="20" RowDefinitions="Auto,Auto,Auto,*">
 
     <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,14">
-      <TextBlock Text="Server" FontSize="26" FontWeight="Bold" />
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <TextBlock Text="Profile" VerticalAlignment="Center" Opacity="0.75" />
+          <ComboBox MinWidth="200" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}"
+                    ToolTip.Tip="Active settings profile — switch it here; edit it on the Settings tab" />
+          <Button Content="Edit" Command="{Binding EditProfileCommand}"
+                  ToolTip.Tip="Open the Settings tab to edit this profile" />
+        </StackPanel>
+        <TextBlock Text="Server" FontSize="26" FontWeight="Bold" VerticalAlignment="Center" />
+      </DockPanel>
       <TextBlock Text="{Binding StatusText}" Opacity="0.75" TextWrapping="Wrap" />
     </StackPanel>
 
@@ -33,9 +42,13 @@
       <StackPanel Orientation="Horizontal" Spacing="8">
         <Button Content="Start" Command="{Binding StartCommand}" Classes="accent" IsEnabled="{Binding !IsBusy}" />
         <Button Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding !IsBusy}" />
+        <Button Content="Restart" Command="{Binding RestartCommand}" IsEnabled="{Binding !IsBusy}"
+                ToolTip.Tip="Stop and start the container, applying the current model and settings" />
         <Button Content="Refresh" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsBusy}" />
         <Button Content="{Binding LiveLogsLabel}" Command="{Binding ToggleLiveLogsCommand}"
                 ToolTip.Tip="Stream the vLLM container log below, updating every 2s. Also saved to the Logs tab." />
+        <Button Content="Copy logs" Click="CopyLogs_Click"
+                ToolTip.Tip="Copy the full log text below to the clipboard" />
         <Button Content="Fix port forwarding" Command="{Binding RepairForwardingCommand}" IsEnabled="{Binding !IsBusy}"
                 ToolTip.Tip="Restarts WSL — use when localhost stops responding after the machine slept" />
       </StackPanel>

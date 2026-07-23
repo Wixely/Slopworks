@@ -157,7 +157,19 @@ public sealed class VllmSmokeTestStep(VllmServerController server) : ISetupStep
         {
         }
 
-        var hint = text switch
+        var hint = DiagnoseHint(text);
+
+        var where = savedName is null ? "" : $" Full log: Logs tab → vllm/{savedName}.";
+        return $"vLLM did not become healthy. {hint}{where}\n--- error excerpt ---\n{ExtractRootCause(text)}";
+    }
+
+    /// <summary>Map a failed vLLM startup log to one actionable hint (the real cause is appended separately).</summary>
+    internal static string DiagnoseHint(string text)
+    {
+        // "Cannot find the config file for awq" — a pre-quantized method set on a non-quantized repo.
+        var missingQuantConfig = ExtractAfter(text, "Cannot find the config file for ");
+
+        return text switch
         {
             _ when text.Contains("UVA is not available", StringComparison.OrdinalIgnoreCase)
                 => "vLLM force-disables pinned memory on WSL, so the V2 GPU runner fails. The fix is " +
@@ -182,6 +194,16 @@ public sealed class VllmSmokeTestStep(VllmServerController server) : ISetupStep
                 => "That repo has no config.json — it's GGUF-only (a llama.cpp/Ollama format) or doesn't exist. " +
                    "vLLM needs a safetensors checkpoint: use the model's AWQ / GPTQ / FP8 (or bnb-4bit) repo, " +
                    "not the -GGUF one. For GGUF files, use Ollama instead.",
+            _ when missingQuantConfig.Length > 0
+                => $"You set Quantization = {missingQuantConfig}, but that method only reads a checkpoint that is " +
+                   $"already quantized that way — it can't quantize a full-precision model. Either point Model at a " +
+                   $"pre-quantized {missingQuantConfig} repo and set Quantization = auto, or use bitsandbytes (the one " +
+                   "on-the-fly method) to quantize a full model at load time.",
+            _ when text.Contains("bitsandbytes", StringComparison.OrdinalIgnoreCase)
+                && text.Contains("Worker_TP1", StringComparison.OrdinalIgnoreCase)
+                => "bitsandbytes weights don't shard across GPUs, so it fails under tensor parallelism. For multi-GPU " +
+                   "use a pre-quantized AWQ/GPTQ repo (Quantization = auto); or keep bitsandbytes and set Split across " +
+                   "GPUs = 1 on a single card with enough VRAM.",
             _ when text.Contains("401") || text.Contains("gated", StringComparison.OrdinalIgnoreCase)
                 => "The model looks gated — set a HuggingFace token in Settings.",
             _ when text.Contains("out of memory", StringComparison.OrdinalIgnoreCase)
@@ -197,9 +219,18 @@ public sealed class VllmSmokeTestStep(VllmServerController server) : ISetupStep
                 => "Shared memory looks too small for the engine — a WSL/container memory issue.",
             _ => "See the extracted error below.",
         };
+    }
 
-        var where = savedName is null ? "" : $" Full log: Logs tab → vllm/{savedName}.";
-        return $"vLLM did not become healthy. {hint}{where}\n--- error excerpt ---\n{ExtractRootCause(text)}";
+    /// <summary>The whitespace-delimited token right after <paramref name="marker"/>, or "" if absent.</summary>
+    internal static string ExtractAfter(string text, string marker)
+    {
+        var at = text.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (at < 0)
+            return "";
+
+        var rest = text[(at + marker.Length)..].TrimStart();
+        var end = rest.IndexOfAny([' ', '\t', '\r', '\n', '.', ',', '\'', '"', ']']);
+        return end < 0 ? rest : rest[..end];
     }
 
     /// <summary>Return the log window starting at the earliest error signature (the real cause).</summary>

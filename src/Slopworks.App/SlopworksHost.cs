@@ -25,6 +25,7 @@ public sealed class SlopworksHost
 {
     public required SlopworksPaths Paths { get; init; }
     public required SlopworksConfig Config { get; init; }
+    public required ProfileManager Profiles { get; init; }
     public required ILogger Logger { get; init; }
     public required IStateJournal Journal { get; init; }
 
@@ -52,6 +53,7 @@ public sealed class SlopworksHost
         paths.EnsureCreated();
 
         var config = ConfigStore.LoadOrCreate(paths);
+        var profiles = new ProfileManager(paths, config); // migrates config.json into a "default" profile
         var logger = new FileLoggerProvider(paths.LogsDir).CreateLogger("Slopworks");
         var commandLog = new FileCommandLog(paths.LogsDir);
         var direct = new SystemProcessRunner();
@@ -69,6 +71,7 @@ public sealed class SlopworksHost
             {
                 Paths = paths,
                 Config = config,
+                Profiles = profiles,
                 Logger = logger,
                 Journal = journal,
                 Wsl = new WindowsWslBackend(probes),
@@ -96,6 +99,7 @@ public sealed class SlopworksHost
             {
                 Paths = paths,
                 Config = config,
+                Profiles = profiles,
                 Logger = logger,
                 Journal = journal,
                 Wsl = null,

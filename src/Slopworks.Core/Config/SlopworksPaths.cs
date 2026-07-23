@@ -12,6 +12,13 @@ public sealed class SlopworksPaths(string root)
     public string Root { get; } = Path.GetFullPath(root);
 
     public string ConfigFile => Path.Combine(Root, "config.json");
+
+    /// <summary>Named settings files (profiles) live here; ConfigFile is the active working copy.</summary>
+    public string ProfilesDir => Path.Combine(Root, "profiles");
+
+    /// <summary>Records which profile name is currently active.</summary>
+    public string ActiveProfileFile => Path.Combine(ProfilesDir, "active.txt");
+
     public string StateDir => Path.Combine(Root, "state");
     public string JournalFile => Path.Combine(StateDir, "journal.json");
     public string SmokeDir => Path.Combine(StateDir, "smoke");
@@ -25,7 +32,7 @@ public sealed class SlopworksPaths(string root)
 
     public void EnsureCreated()
     {
-        foreach (var dir in new[] { Root, StateDir, SmokeDir, ElevatedDir, RootfsDir, WslDir, LogsDir, VllmLogsDir })
+        foreach (var dir in new[] { Root, ProfilesDir, StateDir, SmokeDir, ElevatedDir, RootfsDir, WslDir, LogsDir, VllmLogsDir })
             Directory.CreateDirectory(dir);
     }
 

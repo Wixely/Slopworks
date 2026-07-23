@@ -35,6 +35,26 @@ public sealed class SlopworksConfig
 
     public bool IsAutoMode => string.Equals(Mode, "auto", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Overwrite this instance's contents from another (used to switch the active profile in place,
+    /// so every holder of the shared config reference sees the new values). Add new top-level
+    /// sections here if you introduce any.
+    /// </summary>
+    public void CopyFrom(SlopworksConfig other)
+    {
+        SchemaVersion = other.SchemaVersion;
+        Mode = other.Mode;
+        AutoApproveInsideRoot = other.AutoApproveInsideRoot;
+        Bypasses = other.Bypasses;
+        Forces = other.Forces;
+        Server = other.Server;
+        Images = other.Images;
+        Distro = other.Distro;
+        Artifacts = other.Artifacts;
+        AptRepos = other.AptRepos;
+        Network = other.Network;
+    }
+
     public static Dictionary<string, ArtifactSource> DefaultArtifacts() => new()
     {
         ["rootfs"] = new ArtifactSource
@@ -64,6 +84,19 @@ public sealed class ServerConfig
     public List<string> ExtraContainerArgs { get; set; } = [];
     public string? HfToken { get; set; }
     public double GpuMemoryUtilization { get; set; } = 0.90;
+
+    /// <summary>
+    /// Context window (vLLM --max-model-len). null = use the model's own maximum, which can be
+    /// very large (e.g. 262144) and demands a big KV cache. Lower it to cut VRAM and fit a model.
+    /// </summary>
+    public int? MaxModelLen { get; set; }
+
+    /// <summary>
+    /// KV cache quantization (vLLM --kv-cache-dtype). "auto" = the model dtype (fp16/bf16).
+    /// "fp8" (e4m3) roughly halves KV-cache VRAM so longer context / bigger models fit;
+    /// "fp8_e5m2" trades precision for range. The other main VRAM lever beside MaxModelLen.
+    /// </summary>
+    public string KvCacheDtype { get; set; } = "auto";
 
     /// <summary>
     /// HuggingFace host the model checker queries for repo metadata (files, tags, config.json).

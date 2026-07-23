@@ -67,4 +67,13 @@ public partial class ServerView : UserControl
             await clipboard.SetTextAsync(vm.Model);
         }
     }
+
+    private async void CopyLogs_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is ViewModels.ServerViewModel { Logs: { Length: > 0 } logs }
+            && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+        {
+            await clipboard.SetTextAsync(logs);
+        }
+    }
 }
