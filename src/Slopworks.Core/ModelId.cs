@@ -21,10 +21,13 @@ public static class ModelId
                 cleaned = cleaned[scheme.Length..];
         }
 
-        foreach (var host in new[] { "hf.co/", "huggingface.co/" })
+        foreach (var host in new[] { "www.huggingface.co/", "www.hf.co/", "hf.co/", "huggingface.co/" })
         {
             if (cleaned.StartsWith(host, StringComparison.OrdinalIgnoreCase))
+            {
                 cleaned = cleaned[host.Length..];
+                break;
+            }
         }
 
         return cleaned;

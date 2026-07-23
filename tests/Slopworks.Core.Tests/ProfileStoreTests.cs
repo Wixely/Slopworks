@@ -163,9 +163,27 @@ public class ProfileStoreTests
     [Theory]
     [InlineData("My Profile", "My Profile")]
     [InlineData("bad/name:here", "badnamehere")]
+    [InlineData("v1.2", "v1.2")]            // inner dots are kept
+    [InlineData(".hidden.", "hidden")]      // leading/trailing dots trimmed
     [InlineData("   ", "")]
     public void Clean_StripsUnsafeCharacters(string input, string expected)
         => Assert.Equal(expected, ProfileStore.Clean(input));
+
+    [Fact]
+    public void ConfigStore_Clone_IsDeepAndIndependent()
+    {
+        var original = new SlopworksConfig { Platform = "cuda" };
+        original.Server.Model = "org/m";
+        original.Images.Gpu = "img:1";
+
+        var clone = ConfigStore.Clone(original);
+        clone.Server.Model = "changed";
+        clone.Images.Gpu = "changed";
+
+        Assert.Equal("org/m", original.Server.Model); // original untouched by clone edits
+        Assert.Equal("img:1", original.Images.Gpu);
+        Assert.Equal("cuda", clone.Platform);         // fields carried across
+    }
 
     [Fact]
     public void ConfigCopyFrom_OverwritesAllSections()

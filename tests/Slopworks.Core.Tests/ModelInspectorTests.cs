@@ -145,6 +145,27 @@ public class ModelInspectorTests
     }
 
     [Fact]
+    public void ParseModelApi_ToleratesFloatCounts()
+    {
+        // HF normally sends integers, but a float (e.g. from a re-serialized config) must not drop the value.
+        var json = """{"safetensors":{"total":32763876352.0},"downloads":123.0,"siblings":[{"rfilename":"config.json"}]}""";
+
+        var meta = ModelInspector.ParseModelApi(json);
+
+        Assert.Equal(32763876352, meta.Parameters);
+        Assert.Equal(123, meta.Downloads);
+    }
+
+    [Fact]
+    public void Classify_ParsesFloatMaxContext()
+    {
+        var config = """{"max_position_embeddings":32768.0,"torch_dtype":"bfloat16"}""";
+        var result = ModelConfigClassifier.Classify("org/m", new ModelProbe(true, ["config.json", "model.safetensors"], [], config));
+
+        Assert.Equal(32768, result.MaxContext);
+    }
+
+    [Fact]
     public void ParseModelApi_MalformedJson_ReturnsEmpty()
     {
         var meta = ModelInspector.ParseModelApi("not json at all");

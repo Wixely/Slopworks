@@ -41,7 +41,11 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     private readonly SlopworksHost _host;
     private bool _loading;
     private bool _profileProbed;
+    private bool _gpuControlsBuilt;
     private SystemProfile _profile = SystemProfile.Unknown;
+
+    // One shared client for the (HTTP-free) command preview — avoids allocating an HttpClient per keystroke.
+    private static readonly HttpClient PreviewHttp = new();
 
     public SettingsViewModel(SlopworksHost host)
     {
@@ -290,6 +294,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     private void BuildGpuControls(IReadOnlyList<GpuDevice> gpus)
     {
         _loading = true;
+        _gpuControlsBuilt = true;
 
         var chosen = ParseVisibleGpus(_host.Config.Server.VisibleGpus, gpus);
         Gpus.Clear();
@@ -407,10 +412,15 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         config.Server.KvCacheDtype = string.IsNullOrWhiteSpace(KvCacheDtype) ? "auto" : KvCacheDtype;
         config.Server.EnableToolCalling = EnableToolCalling;
         config.Server.ToolCallParser = string.IsNullOrWhiteSpace(ToolCallParser) ? "hermes" : ToolCallParser.Trim();
-        config.Server.TensorParallelSize = SelectedTensorParallel > 0 ? SelectedTensorParallel : 1;
-        config.Server.VisibleGpus = ComposeVisibleGpus();
-        config.Server.CudaDeviceOrder = ComposeDeviceOrder();
-        config.Server.DisableGpuP2P = DisableGpuP2P;
+        // Only persist GPU fields once the GPU list has actually loaded — otherwise a Save before
+        // enumeration completes would clamp/overwrite the saved values (e.g. tensor-parallel → 1).
+        if (_gpuControlsBuilt)
+        {
+            config.Server.TensorParallelSize = SelectedTensorParallel > 0 ? SelectedTensorParallel : 1;
+            config.Server.VisibleGpus = ComposeVisibleGpus();
+            config.Server.CudaDeviceOrder = ComposeDeviceOrder();
+            config.Server.DisableGpuP2P = DisableGpuP2P;
+        }
         config.Server.ExtraArgs = SplitArgs(ExtraVllmArgs);
         config.Server.ExtraContainerArgs = SplitArgs(ExtraContainerArgs);
         // Images/Distro are resolved from the selected platform (see the Platform tab), not saved here.
@@ -466,7 +476,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
             Network = new NetworkConfig { Proxy = string.IsNullOrWhiteSpace(Proxy) ? null : Proxy.Trim() },
         };
 
-        var controller = new VllmServerController(_host.Linux, preview, new HttpClient(), _host.Paths);
+        var controller = new VllmServerController(_host.Linux, preview, PreviewHttp, _host.Paths);
         CommandPreview = controller.BuildRunCommand(_profile, preview.Server.Model);
         PreviewLabel = _profile.GpuPresent
             ? "Command this machine will run (GPU mode):"

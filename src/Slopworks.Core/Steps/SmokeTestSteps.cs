@@ -204,8 +204,11 @@ public sealed class VllmSmokeTestStep(VllmServerController server) : ISetupStep
                 => "bitsandbytes weights don't shard across GPUs, so it fails under tensor parallelism. For multi-GPU " +
                    "use a pre-quantized AWQ/GPTQ repo (Quantization = auto); or keep bitsandbytes and set Split across " +
                    "GPUs = 1 on a single card with enough VRAM.",
-            _ when text.Contains("401") || text.Contains("gated", StringComparison.OrdinalIgnoreCase)
-                => "The model looks gated — set a HuggingFace token in Settings.",
+            _ when text.Contains("401 Client Error", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("GatedRepo", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("gated repo", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("awaiting a review", StringComparison.OrdinalIgnoreCase)
+                => "The model looks gated — set a HuggingFace token on the Models tab (and accept the model's terms on its HF page).",
             _ when text.Contains("out of memory", StringComparison.OrdinalIgnoreCase)
                 => "GPU ran out of memory. Lower GPU memory utilization in Settings (try 0.8), pick a smaller " +
                    "model, or split across GPUs (tensor parallel). On Windows the display shares the GPU — leave " +

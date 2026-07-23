@@ -30,7 +30,8 @@ public sealed class ModelLibrary
         if (trimmed.Length == 0 || _doc.Models.Any(m => m.Id.Equals(trimmed, StringComparison.OrdinalIgnoreCase)))
             return;
         _doc.Models.Add(new ModelEntry { Id = trimmed });
-        Save();
+        try { Save(); }
+        catch (IOException) { /* seeding the default model is best-effort — never block startup */ }
     }
 
     public IReadOnlyList<ModelEntry> Models => _doc.Models;
@@ -66,7 +67,11 @@ public sealed class ModelLibrary
 
     public ModelEntry Add(string id)
     {
-        var entry = new ModelEntry { Id = id.Trim() };
+        var trimmed = (id ?? "").Trim();
+        // Never add a duplicate — return the existing entry so callers stay idempotent.
+        if (_doc.Models.FirstOrDefault(m => m.Id.Equals(trimmed, StringComparison.OrdinalIgnoreCase)) is { } existing)
+            return existing;
+        var entry = new ModelEntry { Id = trimmed };
         _doc.Models.Add(entry);
         Save();
         return entry;
@@ -84,7 +89,7 @@ public sealed class ModelLibrary
     /// <summary>Point the server/config at this model and persist it to the active profile.</summary>
     public void Select(string id)
     {
-        _config.Server.Model = id.Trim();
+        _config.Server.Model = (id ?? "").Trim();
         _profiles.SaveActive();
     }
 }

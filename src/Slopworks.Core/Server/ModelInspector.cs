@@ -165,6 +165,26 @@ public static class ModelConfigClassifier
             "none");
     }
 
+    /// <summary>Read a JSON element as a long, tolerating integers, floats (e.g. 32768.0) and quoted strings.</summary>
+    internal static long? ReadInt64(JsonElement e)
+    {
+        switch (e.ValueKind)
+        {
+            case JsonValueKind.Number:
+                if (e.TryGetInt64(out var l)) return l;
+                if (e.TryGetDouble(out var d) && d is > 0 and < 9.2e18) return (long)d;
+                return null;
+            case JsonValueKind.String:
+                return long.TryParse(e.GetString(), out var s) ? s : null;
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>Read a positive Int32 (for context length), tolerating floats/strings.</summary>
+    internal static int? ReadPositiveInt32(JsonElement e)
+        => ReadInt64(e) is >= 1 and <= int.MaxValue and { } v ? (int)v : null;
+
     /// <summary>MLX writes a top-level "quantization" object (not "quantization_config") with group_size/bits.</summary>
     internal static bool LooksLikeMlx(string configJson)
     {
@@ -203,8 +223,8 @@ public static class ModelConfigClassifier
                 modelType = mt.GetString();
 
             int? maxContext = null;
-            if (root.TryGetProperty("max_position_embeddings", out var mpe) && mpe.TryGetInt32(out var ctx) && ctx > 0)
-                maxContext = ctx;
+            if (root.TryGetProperty("max_position_embeddings", out var mpe))
+                maxContext = ReadPositiveInt32(mpe);
 
             string? dtype = null;
             if (root.TryGetProperty("torch_dtype", out var dt) && dt.ValueKind == JsonValueKind.String)
@@ -327,14 +347,15 @@ public sealed class ModelInspector(HttpClient http, SlopworksConfig config)
 
             // HF publishes a total param count for safetensors models under "safetensors.total".
             if (root.TryGetProperty("safetensors", out var st) && st.ValueKind == JsonValueKind.Object
-                && st.TryGetProperty("total", out var total) && total.TryGetInt64(out var count) && count > 0)
+                && st.TryGetProperty("total", out var total)
+                && ModelConfigClassifier.ReadInt64(total) is > 0 and { } count)
                 parameters = count;
 
             if (root.TryGetProperty("pipeline_tag", out var pt) && pt.ValueKind == JsonValueKind.String)
                 pipeline = pt.GetString();
 
-            if (root.TryGetProperty("downloads", out var dl) && dl.TryGetInt64(out var dcount))
-                downloads = dcount;
+            if (root.TryGetProperty("downloads", out var dl))
+                downloads = ModelConfigClassifier.ReadInt64(dl);
 
             // "gated" is false, "auto", or "manual" — any non-false value means access is gated.
             if (root.TryGetProperty("gated", out var g))

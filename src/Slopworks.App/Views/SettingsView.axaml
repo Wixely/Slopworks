@@ -21,6 +21,11 @@
       <ScrollViewer Grid.Column="0">
         <StackPanel Spacing="18">
 
+        <Border Background="#22E0A030" BorderBrush="#E0A030" BorderThickness="1" CornerRadius="6" Padding="10">
+          <TextBlock TextWrapping="Wrap" FontSize="12"
+                     Text="⚠ These settings are assembled into a shell command that runs on your machine. If you import a profile or paste extra arguments / model ids from the internet, vet them first — crafted values can execute arbitrary commands." />
+        </Border>
+
         <StackPanel Spacing="8">
           <TextBlock Text="vLLM server" FontWeight="SemiBold" FontSize="16" />
           <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" >

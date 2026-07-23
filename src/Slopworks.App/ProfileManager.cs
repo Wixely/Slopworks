@@ -25,14 +25,16 @@ public sealed class ProfileManager
         _paths = paths;
         _config = config;
         _store = new ProfileStore(paths);
-        _store.EnsureInitialized(config); // migrate an existing config.json into a "default" profile
+        // Migrate an existing config.json into a "default" profile — but strip the platform-owned
+        // fields; PlatformManager seeds the default platform from the live config's images/distro.
+        _store.EnsureInitialized(WithoutPlatformFields(config));
     }
 
     public IReadOnlyList<string> Profiles => _store.List();
     public string Active => _store.Active;
 
     /// <summary>Persist the current live config into the active profile file (called on Settings save).</summary>
-    public void SaveActive() => _store.Save(Active, _config);
+    public void SaveActive() => PersistActive();
 
     /// <summary>Switch the active profile, loading it into the live config and syncing the working copy.</summary>
     public void Switch(string name)
@@ -40,7 +42,7 @@ public sealed class ProfileManager
         if (string.IsNullOrEmpty(name) || name == Active || !_store.Exists(name))
             return;
 
-        _store.Save(Active, _config);   // flush any pending edits to the outgoing profile
+        PersistActive();   // flush any pending edits to the outgoing profile
         Apply(name);
         Changed?.Invoke();
     }
@@ -48,7 +50,7 @@ public sealed class ProfileManager
     /// <summary>Create a new profile from defaults and switch to it. Returns the clean name.</summary>
     public string Create(string name)
     {
-        _store.Save(Active, _config);   // don't lose current edits when we switch away
+        PersistActive();   // don't lose current edits when we switch away
         var created = _store.Create(name, new SlopworksConfig());
         Apply(created);
         Changed?.Invoke();
@@ -58,7 +60,7 @@ public sealed class ProfileManager
     /// <summary>Duplicate the active profile under a new name and switch to the copy.</summary>
     public string Duplicate(string newName)
     {
-        _store.Save(Active, _config);   // ensure the copy reflects current edits
+        PersistActive();   // ensure the copy reflects current edits
         var created = _store.Duplicate(Active, newName);
         Apply(created);
         Changed?.Invoke();
@@ -68,7 +70,7 @@ public sealed class ProfileManager
     /// <summary>Rename the active profile.</summary>
     public string Rename(string newName)
     {
-        _store.Save(Active, _config); // flush pending edits before the file moves
+        PersistActive(); // flush pending edits before the file moves
         var renamed = _store.Rename(Active, newName);
         Changed?.Invoke();
         return renamed;
@@ -90,6 +92,20 @@ public sealed class ProfileManager
     }
 
     public void RequestEdit() => EditRequested?.Invoke();
+
+    // A profile stores only the platform *selection* (config.Platform), not the resolved images/
+    // distro/rootfs — the platform owns those and re-applies them on load. Persist a copy with
+    // those fields reset to defaults so profile files never carry stale platform data.
+    private void PersistActive() => _store.Save(Active, WithoutPlatformFields(_config));
+
+    private static SlopworksConfig WithoutPlatformFields(SlopworksConfig config)
+    {
+        var profile = ConfigStore.Clone(config);
+        profile.Images = new ImagesConfig();
+        profile.Distro = new DistroConfig();
+        profile.Artifacts["rootfs"] = new ArtifactSource();
+        return profile;
+    }
 
     /// <summary>Load a profile into the shared config, point the pointer at it, and sync config.json.</summary>
     private void Apply(string name)

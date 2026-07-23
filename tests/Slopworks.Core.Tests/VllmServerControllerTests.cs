@@ -363,6 +363,23 @@ public class VllmServerControllerTests
     }
 
     [Fact]
+    public void ManagedFlag_NotDuplicated_WhenUserSuppliesItInExtraArgs()
+    {
+        var config = new SlopworksConfig();
+        config.Server.Quantization = "awq";
+        config.Server.TensorParallelSize = 2;
+        config.Server.ExtraArgs = ["--quantization gptq", "--tensor-parallel-size 4"];
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        // The user's explicit values win; the managed flags aren't emitted a second time.
+        Assert.DoesNotContain("--quantization awq", command);
+        Assert.DoesNotContain("--tensor-parallel-size 2", command);
+        Assert.Contains("--quantization gptq", command);
+        Assert.Contains("--tensor-parallel-size 4", command);
+    }
+
+    [Fact]
     public void HfToken_NeverAppearsInTheCommandLine()
     {
         var config = new SlopworksConfig();

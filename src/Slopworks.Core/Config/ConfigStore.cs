@@ -20,6 +20,12 @@ public static class ConfigStore
         return config;
     }
 
+    /// <summary>Deep-clone a config (via its JSON contract) so a caller can persist a modified copy.</summary>
+    public static SlopworksConfig Clone(SlopworksConfig config)
+        => JsonSerializer.Deserialize(
+               JsonSerializer.Serialize(config, SlopworksJsonContext.Default.SlopworksConfig),
+               SlopworksJsonContext.Default.SlopworksConfig) ?? new SlopworksConfig();
+
     public static void Save(SlopworksPaths paths, SlopworksConfig config)
     {
         Directory.CreateDirectory(paths.Root);

@@ -58,7 +58,13 @@ public sealed class SlopworksHost
         var profiles = new ProfileManager(paths, config); // migrates config.json into a "default" profile
         var models = new ModelLibrary(paths, config, profiles);
         var platforms = new PlatformManager(paths, config, profiles); // seeds a "default" platform, resolves images/distro
-        profiles.Changed += platforms.Apply; // switching profile re-resolves its platform into the live config
+        // Switching profile re-resolves its platform into the live config; persist so config.json
+        // matches the resolved images/distro rather than the switched-in profile's stored snapshot.
+        profiles.Changed += () =>
+        {
+            platforms.Apply();
+            ConfigStore.Save(paths, config);
+        };
         var logger = new FileLoggerProvider(paths.LogsDir).CreateLogger("Slopworks");
         var commandLog = new FileCommandLog(paths.LogsDir);
         var direct = new SystemProcessRunner();

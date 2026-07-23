@@ -154,6 +154,15 @@ public partial class ModelsViewModel : ObservableObject, IActivatableTab
 
     public bool HasHfToken => !string.IsNullOrWhiteSpace(_host.Config.Server.HfToken);
 
+    /// <summary>
+    /// The folder where downloaded models are cached. On Windows this is inside the WSL distro (kept
+    /// on the fast Linux filesystem, not /mnt/c), browsable from Explorer via its \\wsl.localhost path;
+    /// on Linux it's under the Slopworks data folder.
+    /// </summary>
+    public string ModelsFolder => OperatingSystem.IsWindows()
+        ? $@"\\wsl.localhost\{SlopworksPaths.DistroName}" + _host.Server.HfCachePath.Replace('/', '\\')
+        : _host.Server.HfCachePath;
+
     private string HfBase => (string.IsNullOrWhiteSpace(_host.Config.Server.HuggingFaceEndpoint)
         ? "https://huggingface.co"
         : _host.Config.Server.HuggingFaceEndpoint).TrimEnd('/');
@@ -161,7 +170,13 @@ public partial class ModelsViewModel : ObservableObject, IActivatableTab
     /// <summary>HuggingFace page URL of the selected model, for the Open link.</summary>
     public string? SelectedModelUrl => SelectedModel?.Url;
 
-    public void Activate() => RebuildList();
+    public void Activate()
+    {
+        RebuildList();
+        // The token lives in the active profile — re-read it in case the profile changed while away.
+        OnPropertyChanged(nameof(HfToken));
+        OnPropertyChanged(nameof(HasHfToken));
+    }
 
     public void Deactivate() { }
 

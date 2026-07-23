@@ -99,30 +99,38 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
         args.Add(image);
         args.Add($"--model {model}");
 
+        // A managed flag is skipped when the user already supplied it via Extra vLLM arguments, so
+        // we never emit a duplicate (which argparse rejects or resolves ambiguously).
+        bool UserSet(string flag) => config.Server.ExtraArgs.Any(a =>
+            a.StartsWith(flag, StringComparison.OrdinalIgnoreCase)
+            || a.Contains(" " + flag, StringComparison.OrdinalIgnoreCase));
+
         // "auto" (or blank) lets vLLM detect quantization from the checkpoint; anything else forces it.
-        if (config.Server.Quantization is { Length: > 0 } quant && !quant.Equals("auto", StringComparison.OrdinalIgnoreCase))
+        if (config.Server.Quantization is { Length: > 0 } quant && !quant.Equals("auto", StringComparison.OrdinalIgnoreCase)
+            && !UserSet("--quantization"))
             args.Add($"--quantization {quant}");
 
-        // Context window. Unset = the model's own (often huge) maximum. Skip if the user already
-        // supplied it via extra args so we never pass a duplicate flag.
-        if (config.Server.MaxModelLen is { } maxLen && maxLen > 0
-            && !config.Server.ExtraArgs.Any(a => a.Contains("--max-model-len", StringComparison.OrdinalIgnoreCase)))
+        // Context window. Unset = the model's own (often huge) maximum.
+        if (config.Server.MaxModelLen is { } maxLen && maxLen > 0 && !UserSet("--max-model-len"))
             args.Add($"--max-model-len {maxLen}");
 
         // KV cache quantization — fp8 roughly halves KV-cache VRAM. "auto" keeps the model dtype.
-        if (config.Server.KvCacheDtype is { Length: > 0 } kvDtype && !kvDtype.Equals("auto", StringComparison.OrdinalIgnoreCase))
+        if (config.Server.KvCacheDtype is { Length: > 0 } kvDtype && !kvDtype.Equals("auto", StringComparison.OrdinalIgnoreCase)
+            && !UserSet("--kv-cache-dtype"))
             args.Add($"--kv-cache-dtype {kvDtype}");
 
         if (profile.GpuPresent)
         {
-            args.Add($"--gpu-memory-utilization {config.Server.GpuMemoryUtilization:0.##}");
+            if (!UserSet("--gpu-memory-utilization"))
+                args.Add($"--gpu-memory-utilization {config.Server.GpuMemoryUtilization:0.##}");
             if (config.Server.TensorParallelSize > 1)
             {
-                args.Add($"--tensor-parallel-size {config.Server.TensorParallelSize}");
+                if (!UserSet("--tensor-parallel-size"))
+                    args.Add($"--tensor-parallel-size {config.Server.TensorParallelSize}");
 
                 // The custom all-reduce uses CUDA IPC memory handles (open_mem_handle), which
                 // WSL doesn't support — "invalid resource handle". Fall back to NCCL.
-                if (OperatingSystem.IsWindows())
+                if (OperatingSystem.IsWindows() && !UserSet("--disable-custom-all-reduce"))
                     args.Add("--disable-custom-all-reduce");
             }
         }
@@ -130,8 +138,9 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
         // OpenAI tool / function calling — without this, tool_choice="auto" returns 400.
         if (config.Server.EnableToolCalling)
         {
-            args.Add("--enable-auto-tool-choice");
-            if (config.Server.ToolCallParser is { Length: > 0 } toolParser)
+            if (!UserSet("--enable-auto-tool-choice"))
+                args.Add("--enable-auto-tool-choice");
+            if (config.Server.ToolCallParser is { Length: > 0 } toolParser && !UserSet("--tool-call-parser"))
                 args.Add($"--tool-call-parser {toolParser}");
         }
 

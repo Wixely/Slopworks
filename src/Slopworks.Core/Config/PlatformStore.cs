@@ -37,11 +37,18 @@ public sealed class PlatformStore(SlopworksPaths paths)
     {
         get
         {
-            if (File.Exists(paths.DefaultPlatformFile))
+            try
             {
-                var name = File.ReadAllText(paths.DefaultPlatformFile).Trim();
-                if (name.Length > 0 && Exists(name))
-                    return name;
+                if (File.Exists(paths.DefaultPlatformFile))
+                {
+                    var name = File.ReadAllText(paths.DefaultPlatformFile).Trim();
+                    if (name.Length > 0 && Exists(name))
+                        return name;
+                }
+            }
+            catch (IOException)
+            {
+                // A locked/racing pointer file must not crash the UI — fall back to the first platform.
             }
             return List().FirstOrDefault() ?? DefaultName;
         }

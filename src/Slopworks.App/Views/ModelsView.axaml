@@ -10,6 +10,9 @@
         <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ShowAdvanced}" VerticalAlignment="Top"
                       OnContent="Advanced on" OffContent="Show advanced"
                       ToolTip.Tip="Show HF investigation tools — check a model's quant type, parameter size and vLLM suitability. Remembered across sessions." />
+        <Button DockPanel.Dock="Right" Content="Open models folder" Click="OpenModelsFolder_Click"
+                Margin="0,0,8,0" VerticalAlignment="Top"
+                ToolTip.Tip="Open the folder where downloaded model files are cached (inside WSL on Windows, browsable from Explorer)" />
         <StackPanel Spacing="6">
           <TextBlock Text="Models" FontSize="26" FontWeight="Bold" />
           <TextBlock Text="{Binding StatusText}" Opacity="0.75" TextWrapping="Wrap"

@@ -22,9 +22,6 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
     private string _model = host.Config.Server.Model;
 
     [ObservableProperty]
-    private string _hfToken = host.Config.Server.HfToken ?? "";
-
-    [ObservableProperty]
     private string _statusText = "Press Refresh to query the server state.";
 
     [ObservableProperty]
@@ -162,12 +159,13 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
         OnPropertyChanged(nameof(AgentHint));
         OnPropertyChanged(nameof(ModelAdvisory));
         OnPropertyChanged(nameof(HasModelAdvisory));
-        // The previous check result is about a different id now.
-        HasModelCheck = false;
-        ModelCheckText = "";
         UpdateCommandPreview();
         if (_syncingModel || string.IsNullOrWhiteSpace(value))
             return;
+        // A real (user) model change — the previous Check result no longer applies. (Not cleared
+        // during sync, so activating the tab / switching profile keeps a matching check visible.)
+        HasModelCheck = false;
+        ModelCheckText = "";
         host.Models.Select(value); // picking a model here makes it the profile's server model
     }
 
@@ -241,7 +239,6 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
         host.Profiles.Switch(value);
         // Reflect the switched-in profile in this tab's fields.
         RefreshModels(); // the new profile may use a different model
-        HfToken = host.Config.Server.HfToken ?? "";
         UpdateCommandPreview();
         StatusText = $"Switched to profile '{host.Profiles.Active}'.";
     }
@@ -424,7 +421,6 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
         // The active profile / model may have changed on another tab while we were away — re-sync.
         RefreshProfiles();
         RefreshModels();
-        HfToken = host.Config.Server.HfToken ?? "";
         UpdateCommandPreview();
         _ = EnsureProfileAsync();
         StartMetrics();
@@ -448,8 +444,8 @@ public partial class ServerViewModel(SlopworksHost host) : ObservableObject, IAc
 
     private void SaveConfig()
     {
+        // The HF token is owned by the Models tab now, so we don't touch it here.
         host.Config.Server.Model = Model.Trim();
-        host.Config.Server.HfToken = string.IsNullOrWhiteSpace(HfToken) ? null : HfToken.Trim();
         ConfigStore.Save(host.Paths, host.Config);
         host.Profiles.SaveActive(); // keep the active profile file in sync with Server-tab edits
     }

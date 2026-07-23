@@ -28,11 +28,18 @@ public sealed class ProfileStore(SlopworksPaths paths)
     {
         get
         {
-            if (File.Exists(paths.ActiveProfileFile))
+            try
             {
-                var name = File.ReadAllText(paths.ActiveProfileFile).Trim();
-                if (name.Length > 0 && Exists(name))
-                    return name;
+                if (File.Exists(paths.ActiveProfileFile))
+                {
+                    var name = File.ReadAllText(paths.ActiveProfileFile).Trim();
+                    if (name.Length > 0 && Exists(name))
+                        return name;
+                }
+            }
+            catch (IOException)
+            {
+                // A locked/racing pointer file must not crash the UI — fall back to the first profile.
             }
             return List().FirstOrDefault() ?? DefaultName;
         }
@@ -135,12 +142,14 @@ public sealed class ProfileStore(SlopworksPaths paths)
 
     private string PathFor(string name) => Path.Combine(paths.ProfilesDir, Clean(name) + ".json");
 
-    /// <summary>Reduce a display name to a safe file base (drops path/invalid chars, trims, collapses spaces).</summary>
+    /// <summary>Reduce a display name to a safe file base (drops path/invalid chars; keeps inner dots).</summary>
     public static string Clean(string name)
     {
         var trimmed = (name ?? "").Trim();
-        var kept = new string([.. trimmed.Where(c => !Path.GetInvalidFileNameChars().Contains(c) && c != '.')]);
-        return kept.Trim();
+        var kept = new string([.. trimmed.Where(c => !Path.GetInvalidFileNameChars().Contains(c))]);
+        // Trim leading/trailing dots (Windows strips trailing dots from filenames; leading dot hides on Linux)
+        // but keep inner ones so "v1.2" stays intact.
+        return kept.Trim().Trim('.').Trim();
     }
 
     public static bool IsValidName(string name) => Clean(name).Length > 0;

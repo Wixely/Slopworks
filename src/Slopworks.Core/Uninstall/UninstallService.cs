@@ -112,6 +112,20 @@ public sealed class UninstallService(
         return statuses;
     }
 
+    /// <summary>Every container image referenced by any platform (plus the active config), de-duplicated.</summary>
+    private IEnumerable<string> AllPlatformImages()
+    {
+        var images = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { config.Images.Gpu, config.Images.Cpu };
+        var store = new PlatformStore(paths);
+        foreach (var name in store.List())
+        {
+            var platform = store.Load(name);
+            images.Add(platform.Images.Gpu);
+            images.Add(platform.Images.Cpu);
+        }
+        return images.Where(i => !string.IsNullOrWhiteSpace(i));
+    }
+
     private async Task<CleanupStatus> GetImagesStatusAsync(IProcessRunner runner, CancellationToken ct)
     {
         var present = false;
@@ -120,9 +134,9 @@ public sealed class UninstallService(
         {
             var probe = await runner.RunAsync(
                 linux.Command($"podman images --format '{{{{.Repository}}}}:{{{{.Tag}}}}' 2>/dev/null || true"), null, ct);
+            var all = AllPlatformImages().ToList();
             var relevant = probe.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Where(i => config.Images.Gpu.Contains(i, StringComparison.OrdinalIgnoreCase)
-                         || config.Images.Cpu.Contains(i, StringComparison.OrdinalIgnoreCase)
+                .Where(i => all.Any(img => img.Contains(i, StringComparison.OrdinalIgnoreCase))
                          || i.Contains("vllm", StringComparison.OrdinalIgnoreCase))
                 .ToList();
             present = relevant.Count > 0;
@@ -237,8 +251,10 @@ public sealed class UninstallService(
                     return new CleanupResult(id, true, "Downloaded files deleted.");
 
                 case ImagesId:
+                    // Remove the images of every platform, not just the active one, so no platform's
+                    // pulled images linger in podman storage.
                     await runner.RunAsync(
-                        linux.Command($"podman rmi -f {config.Images.Gpu} {config.Images.Cpu} 2>/dev/null || true"),
+                        linux.Command($"podman rmi -f {string.Join(' ', AllPlatformImages())} 2>/dev/null || true"),
                         output, ct);
                     return new CleanupResult(id, true, "vLLM container images removed from podman storage.");
 
