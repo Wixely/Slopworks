@@ -12,6 +12,12 @@ public sealed class ModelEntry
     /// <summary>Free-form user notes.</summary>
     public string Notes { get; set; } = "";
 
+    /// <summary>
+    /// Chat template attached to this model: the base name of a file in {root}/templates, passed to
+    /// vLLM as --chat-template when this model is served. null/blank = the model's built-in template.
+    /// </summary>
+    public string? ChatTemplate { get; set; }
+
     // Cached from the last "Check on HF" so the library shows metadata without re-fetching.
     public string? Verdict { get; set; }        // Servable / Caution / Unservable / Unknown
     public string? Summary { get; set; }        // one-line verdict

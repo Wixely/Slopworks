@@ -75,7 +75,7 @@
 
       <!-- RIGHT column: active profile + the exact command it will run -->
       <Grid Grid.Column="2" RowDefinitions="Auto,Auto,Auto,*">
-        <TextBlock Grid.Row="0" Text="Profile" FontWeight="SemiBold" FontSize="13" />
+        <TextBlock Grid.Row="0" Text="Settings Profile" FontWeight="SemiBold" FontSize="13" />
         <DockPanel Grid.Row="1" Margin="0,4,0,0">
           <Button DockPanel.Dock="Right" Content="Edit" Command="{Binding EditProfileCommand}" Margin="8,0,0,0"
                   ToolTip.Tip="Open the Settings tab to edit this profile" />

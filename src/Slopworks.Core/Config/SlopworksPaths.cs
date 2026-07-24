@@ -25,6 +25,9 @@ public sealed class SlopworksPaths(string root)
     /// <summary>Records which platform is the default (used by profiles that don't pick one).</summary>
     public string DefaultPlatformFile => Path.Combine(PlatformsDir, "default.txt");
 
+    /// <summary>User chat-template files (*.jinja), mounted into the container as --chat-template.</summary>
+    public string TemplatesDir => Path.Combine(Root, "templates");
+
     public string StateDir => Path.Combine(Root, "state");
     public string JournalFile => Path.Combine(StateDir, "journal.json");
     public string SmokeDir => Path.Combine(StateDir, "smoke");
@@ -38,7 +41,7 @@ public sealed class SlopworksPaths(string root)
 
     public void EnsureCreated()
     {
-        foreach (var dir in new[] { Root, ProfilesDir, PlatformsDir, StateDir, SmokeDir, ElevatedDir, RootfsDir, WslDir, LogsDir, VllmLogsDir })
+        foreach (var dir in new[] { Root, ProfilesDir, PlatformsDir, TemplatesDir, StateDir, SmokeDir, ElevatedDir, RootfsDir, WslDir, LogsDir, VllmLogsDir })
             Directory.CreateDirectory(dir);
     }
 

@@ -97,7 +97,9 @@ public partial class ModelItemViewModel : ObservableObject
 public partial class ModelsViewModel : ObservableObject, IActivatableTab
 {
     private readonly SlopworksHost _host;
+    private readonly TemplateStore _templates;
     private bool _syncingSelection;
+    private bool _syncingTemplate;
 
     public ObservableCollection<ModelItemViewModel> Models { get; } = [];
 
@@ -111,9 +113,16 @@ public partial class ModelsViewModel : ObservableObject, IActivatableTab
 
     [ObservableProperty] private bool _isTokenWarningVisible;
 
+    /// <summary>Chat-template picker for the selected model: "None" plus the available template names.</summary>
+    public const string NoTemplateOption = "None — model's own template";
+    public ObservableCollection<string> TemplateOptions { get; } = [];
+    [ObservableProperty] private string? _selectedModelTemplate;
+
     public ModelsViewModel(SlopworksHost host)
     {
         _host = host;
+        _templates = new TemplateStore(host.Paths);
+        RefreshTemplateOptions();
         RebuildList();
     }
 
@@ -172,10 +181,43 @@ public partial class ModelsViewModel : ObservableObject, IActivatableTab
 
     public void Activate()
     {
+        RefreshTemplateOptions(); // templates may have been added/renamed on the Templates tab
         RebuildList();
         // The token lives in the active profile — re-read it in case the profile changed while away.
         OnPropertyChanged(nameof(HfToken));
         OnPropertyChanged(nameof(HasHfToken));
+    }
+
+    /// <summary>Repopulate the template dropdown from the templates folder.</summary>
+    private void RefreshTemplateOptions()
+    {
+        TemplateOptions.Clear();
+        TemplateOptions.Add(NoTemplateOption);
+        foreach (var name in _templates.List())
+            TemplateOptions.Add(name);
+        SyncTemplateForSelectedModel();
+    }
+
+    /// <summary>Point the dropdown at the selected model's attached template (or None).</summary>
+    private void SyncTemplateForSelectedModel()
+    {
+        _syncingTemplate = true;
+        var attached = SelectedModel?.Entry.ChatTemplate;
+        SelectedModelTemplate = !string.IsNullOrWhiteSpace(attached) && TemplateOptions.Contains(attached)
+            ? attached
+            : NoTemplateOption;
+        _syncingTemplate = false;
+    }
+
+    partial void OnSelectedModelTemplateChanged(string? value)
+    {
+        if (_syncingTemplate || value is null || SelectedModel is null)
+            return;
+        var template = value == NoTemplateOption ? null : value;
+        _host.Models.SetTemplate(SelectedModel.Entry, template);
+        StatusText = template is null
+            ? $"'{SelectedModel.Id}' will use the model's built-in chat template."
+            : $"'{SelectedModel.Id}' → chat template '{template}'. Restart the server to apply.";
     }
 
     public void Deactivate() { }
@@ -197,6 +239,7 @@ public partial class ModelsViewModel : ObservableObject, IActivatableTab
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(SelectedModelUrl));
         CheckModelCommand.NotifyCanExecuteChanged();
+        SyncTemplateForSelectedModel(); // show this model's attached template in the dropdown
         if (_syncingSelection || value is null)
             return;
         _host.Models.Select(value.Id); // becomes the Server tab's model

@@ -30,6 +30,9 @@
     <TabItem Header="Platform">
       <views:PlatformsView DataContext="{Binding Platforms}" />
     </TabItem>
+    <TabItem Header="Templates">
+      <views:TemplatesView DataContext="{Binding Templates}" />
+    </TabItem>
     <TabItem Header="Maintenance">
       <views:MaintenanceView DataContext="{Binding Maintenance}" />
     </TabItem>

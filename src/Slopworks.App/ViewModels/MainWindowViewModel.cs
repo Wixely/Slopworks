@@ -17,6 +17,7 @@ public partial class MainWindowViewModel : ObservableObject
     public MaintenanceViewModel Maintenance { get; }
     public SettingsViewModel Settings { get; }
     public PlatformsViewModel Platforms { get; }
+    public TemplatesViewModel Templates { get; }
     public SystemUsageViewModel SystemUsage { get; }
     public LogsViewModel Logs { get; }
 
@@ -32,6 +33,7 @@ public partial class MainWindowViewModel : ObservableObject
         Maintenance = new MaintenanceViewModel(host);
         Settings = new SettingsViewModel(host);
         Platforms = new PlatformsViewModel(host);
+        Templates = new TemplatesViewModel(host);
         SystemUsage = new SystemUsageViewModel(host);
         Logs = new LogsViewModel(host);
 
@@ -60,8 +62,9 @@ public partial class MainWindowViewModel : ObservableObject
         4 => Models,
         5 => Settings,
         6 => Platforms,
-        7 => Maintenance,
-        8 => Logs,
+        7 => Templates,
+        8 => Maintenance,
+        9 => Logs,
         _ => this,
     };
 }

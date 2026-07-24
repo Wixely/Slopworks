@@ -187,6 +187,18 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     [ObservableProperty] private string _extraVllmArgs = "";
     [ObservableProperty] private string _extraContainerArgs = "";
 
+    // Precision / concurrency levers (from the dual-card parameter review).
+    [ObservableProperty] private string _dtype = "auto";
+    [ObservableProperty] private string _maxNumSeqs = "";
+    [ObservableProperty] private bool _enforceEager;
+    [ObservableProperty] private bool _trustRemoteCode;
+
+    // Advanced group, revealed by ShowAdvancedServer.
+    [ObservableProperty] private bool _showAdvancedServer;
+    [ObservableProperty] private string _maxNumBatchedTokens = "";
+    [ObservableProperty] private int _prefixCachingIndex; // 0 = vLLM default, 1 = on, 2 = off
+    [ObservableProperty] private string _servedModelName = "";
+
     /// <summary>A caution shown under the model field when the id looks Ollama/GGUF-shaped.</summary>
     public string? ModelAdvisory => ModelId.Advisory(Model);
     public bool HasModelAdvisory => ModelAdvisory is not null;
@@ -203,6 +215,13 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         ["auto", "awq", "gptq", "compressed-tensors", "fp8", "nvfp4", "modelopt_fp4", "bitsandbytes"];
 
     public IReadOnlyList<string> KvCacheOptions { get; } = ["auto", "fp8", "fp8_e5m2"];
+
+    public IReadOnlyList<string> DtypeOptions { get; } = ["auto", "bfloat16", "float16", "float32"];
+
+    public IReadOnlyList<string> PrefixCachingOptions { get; } = ["vLLM default", "On", "Off"];
+
+    /// <summary>Maps the prefix-caching dropdown to the tri-state config value (default / on / off).</summary>
+    private bool? PrefixCachingChoice() => PrefixCachingIndex switch { 1 => true, 2 => false, _ => null };
 
     // GPUs (populated from nvidia-smi when the tab is first viewed)
     public ObservableCollection<GpuCheckItemViewModel> Gpus { get; } = [];
@@ -270,7 +289,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         if (!_loading && e.PropertyName is not (nameof(CommandPreview) or nameof(PreviewLabel) or nameof(StatusText)
                 or nameof(ModelAdvisory) or nameof(HasModelAdvisory)
                 or nameof(SelectedProfile) or nameof(ProfileNameEdit) or nameof(DeleteArmed)
-                or nameof(SelectedPlatformOption)))
+                or nameof(SelectedPlatformOption) or nameof(ShowAdvancedServer)))
             UpdatePreview();
     }
 
@@ -372,6 +391,17 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         ExtraVllmArgs = string.Join(Environment.NewLine, config.Server.ExtraArgs);
         ExtraContainerArgs = string.Join(Environment.NewLine, config.Server.ExtraContainerArgs);
 
+        Dtype = string.IsNullOrWhiteSpace(config.Server.Dtype) ? "auto" : config.Server.Dtype;
+        MaxNumSeqs = config.Server.MaxNumSeqs?.ToString() ?? "";
+        EnforceEager = config.Server.EnforceEager;
+        TrustRemoteCode = config.Server.TrustRemoteCode;
+        MaxNumBatchedTokens = config.Server.MaxNumBatchedTokens?.ToString() ?? "";
+        PrefixCachingIndex = config.Server.EnablePrefixCaching switch { true => 1, false => 2, _ => 0 };
+        ServedModelName = config.Server.ServedModelName ?? "";
+        // Auto-reveal the advanced group when the profile actually uses one of its options (only opens it).
+        if (config.Server.MaxNumBatchedTokens is not null || config.Server.EnablePrefixCaching is not null
+            || !string.IsNullOrWhiteSpace(config.Server.ServedModelName))
+            ShowAdvancedServer = true;
 
         Proxy = config.Network.Proxy ?? "";
         AllowSystemProxy = config.Network.AllowSystemProxy;
@@ -396,7 +426,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     [RelayCommand]
     private void Save()
     {
-        if (!TryValidate(out var port, out var gpuMem, out var maxModelLen, out var error))
+        if (!TryValidate(out var port, out var gpuMem, out var maxModelLen, out var maxNumSeqs, out var maxNumBatchedTokens, out var error))
         {
             StatusText = error;
             return;
@@ -410,6 +440,13 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         config.Server.VllmLogLevel = VllmLogLevel;
         config.Server.Quantization = string.IsNullOrWhiteSpace(Quantization) ? "auto" : Quantization;
         config.Server.KvCacheDtype = string.IsNullOrWhiteSpace(KvCacheDtype) ? "auto" : KvCacheDtype;
+        config.Server.Dtype = string.IsNullOrWhiteSpace(Dtype) ? "auto" : Dtype;
+        config.Server.MaxNumSeqs = maxNumSeqs;
+        config.Server.EnforceEager = EnforceEager;
+        config.Server.TrustRemoteCode = TrustRemoteCode;
+        config.Server.MaxNumBatchedTokens = maxNumBatchedTokens;
+        config.Server.EnablePrefixCaching = PrefixCachingChoice();
+        config.Server.ServedModelName = string.IsNullOrWhiteSpace(ServedModelName) ? null : ServedModelName.Trim();
         config.Server.EnableToolCalling = EnableToolCalling;
         config.Server.ToolCallParser = string.IsNullOrWhiteSpace(ToolCallParser) ? "hermes" : ToolCallParser.Trim();
         // Only persist GPU fields once the GPU list has actually loaded — otherwise a Save before
@@ -443,7 +480,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
 
     private void UpdatePreview()
     {
-        if (!TryValidate(out var port, out var gpuMem, out var maxModelLen, out var error))
+        if (!TryValidate(out var port, out var gpuMem, out var maxModelLen, out var maxNumSeqs, out var maxNumBatchedTokens, out var error))
         {
             CommandPreview = "";
             PreviewLabel = error;
@@ -461,6 +498,13 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
                 VllmLogLevel = VllmLogLevel,
                 Quantization = string.IsNullOrWhiteSpace(Quantization) ? "auto" : Quantization,
                 KvCacheDtype = string.IsNullOrWhiteSpace(KvCacheDtype) ? "auto" : KvCacheDtype,
+                Dtype = string.IsNullOrWhiteSpace(Dtype) ? "auto" : Dtype,
+                MaxNumSeqs = maxNumSeqs,
+                EnforceEager = EnforceEager,
+                TrustRemoteCode = TrustRemoteCode,
+                MaxNumBatchedTokens = maxNumBatchedTokens,
+                EnablePrefixCaching = PrefixCachingChoice(),
+                ServedModelName = string.IsNullOrWhiteSpace(ServedModelName) ? null : ServedModelName.Trim(),
                 EnableToolCalling = EnableToolCalling,
                 ToolCallParser = string.IsNullOrWhiteSpace(ToolCallParser) ? "hermes" : ToolCallParser.Trim(),
                 TensorParallelSize = SelectedTensorParallel > 0 ? SelectedTensorParallel : 1,
@@ -483,10 +527,13 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
             : "Command this machine will run (CPU mode — no NVIDIA GPU detected):";
     }
 
-    private bool TryValidate(out int port, out double gpuMem, out int? maxModelLen, out string error)
+    private bool TryValidate(out int port, out double gpuMem, out int? maxModelLen,
+        out int? maxNumSeqs, out int? maxNumBatchedTokens, out string error)
     {
         gpuMem = 0.9;
         maxModelLen = null;
+        maxNumSeqs = null;
+        maxNumBatchedTokens = null;
         error = "";
 
         if (!int.TryParse(Port, out port) || port is < 1 or > 65535)
@@ -511,12 +558,33 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
             maxModelLen = len;
         }
 
+        if (!TryParseOptionalPositiveInt(MaxNumSeqs, "Max concurrent sequences", out maxNumSeqs, out error))
+            return false;
+        if (!TryParseOptionalPositiveInt(MaxNumBatchedTokens, "Max batched tokens", out maxNumBatchedTokens, out error))
+            return false;
+
         if (string.IsNullOrWhiteSpace(Model))
         {
             error = "Model id cannot be empty.";
             return false;
         }
 
+        return true;
+    }
+
+    /// <summary>Parses an optional positive-int field: blank is valid (null); anything non-positive is an error.</summary>
+    private static bool TryParseOptionalPositiveInt(string text, string label, out int? value, out string error)
+    {
+        value = null;
+        error = "";
+        if (string.IsNullOrWhiteSpace(text))
+            return true;
+        if (!int.TryParse(text.Trim(), out var n) || n <= 0)
+        {
+            error = $"{label} must be a positive whole number (or blank).";
+            return false;
+        }
+        value = n;
         return true;
     }
 

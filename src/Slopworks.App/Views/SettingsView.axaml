@@ -77,14 +77,55 @@
                       ItemsSource="{Binding KvCacheOptions}" SelectedItem="{Binding KvCacheDtype}" />
           </Grid>
 
+          <Grid ColumnDefinitions="220,*">
+            <TextBlock Text="Compute dtype" VerticalAlignment="Center"
+                       ToolTip.Tip="vLLM --dtype. auto matches the checkpoint's own precision (recommended). bfloat16/float16 force half precision; float32 is rarely needed and doubles VRAM. Restart the server to apply." />
+            <ComboBox Grid.Column="1" MinWidth="160" Margin="0,2" HorizontalAlignment="Left"
+                      ItemsSource="{Binding DtypeOptions}" SelectedItem="{Binding Dtype}" />
+          </Grid>
+
+          <Grid ColumnDefinitions="220,*">
+            <TextBlock Text="Max concurrent sequences" VerticalAlignment="Center"
+                       ToolTip.Tip="vLLM --max-num-seqs. Blank = vLLM default (256). Lower it (e.g. 1–2) so one long-context request can claim more KV cache — it's a cap, not a reservation, so short requests are unaffected. Restart the server to apply." />
+            <TextBox Grid.Column="1" Text="{Binding MaxNumSeqs}" Margin="0,2" PlaceholderText="vLLM default (leave blank)" />
+          </Grid>
+
+          <CheckBox IsChecked="{Binding EnforceEager}"
+                    Content="Disable CUDA graphs (--enforce-eager)"
+                    ToolTip.Tip="Frees the VRAM that CUDA-graph capture reserves and is a documented requirement for long context under WSL2. Costs some throughput — turn on if you hit OOM near your context limit." />
+
+          <CheckBox IsChecked="{Binding TrustRemoteCode}"
+                    Content="Trust remote code (--trust-remote-code)"
+                    ToolTip.Tip="Lets the model repo run its own modeling code — some architectures need it to load at all. Only enable for repos you trust: it executes code straight from the repo." />
+
           <CheckBox IsChecked="{Binding EnableToolCalling}"
                     Content="Enable tool / function calling (--enable-auto-tool-choice)"
                     ToolTip.Tip="Agents that send tools with tool_choice=auto need this, or vLLM returns 400. On by default." />
           <Grid ColumnDefinitions="220,*" IsVisible="{Binding EnableToolCalling}">
             <TextBlock Text="Tool call parser" VerticalAlignment="Center"
-                       ToolTip.Tip="--tool-call-parser, must match the model's tool format. Common: hermes (Qwen/Hermes), llama3_json, mistral, pythonic." />
+                       ToolTip.Tip="--tool-call-parser, must match the model's tool format. Common: hermes (Qwen/Hermes), llama3_json, mistral, pythonic, qwen3_coder." />
             <TextBox Grid.Column="1" Text="{Binding ToolCallParser}" Margin="0,2" PlaceholderText="hermes" />
           </Grid>
+
+          <CheckBox IsChecked="{Binding ShowAdvancedServer}" Content="Show advanced vLLM options" Margin="0,4,0,0" />
+          <StackPanel Spacing="8" IsVisible="{Binding ShowAdvancedServer}">
+            <Grid ColumnDefinitions="220,*">
+              <TextBlock Text="Max batched tokens" VerticalAlignment="Center"
+                         ToolTip.Tip="vLLM --max-num-batched-tokens. Blank = vLLM default. Chunked-prefill token budget per step: lower it to soften prefill/decode starvation when long prompts and active generations share the GPU, raise it to speed bulk prefill." />
+              <TextBox Grid.Column="1" Text="{Binding MaxNumBatchedTokens}" Margin="0,2" PlaceholderText="vLLM default (leave blank)" />
+            </Grid>
+            <Grid ColumnDefinitions="220,*">
+              <TextBlock Text="Prefix caching" VerticalAlignment="Center"
+                         ToolTip.Tip="vLLM --enable-prefix-caching / --no-enable-prefix-caching. 'vLLM default' leaves it as vLLM ships it (on in current versions). Caching shared prompt prefixes is a big win for agents that reuse a system prompt; set Off only to isolate a caching issue." />
+              <ComboBox Grid.Column="1" MinWidth="160" Margin="0,2" HorizontalAlignment="Left"
+                        ItemsSource="{Binding PrefixCachingOptions}" SelectedIndex="{Binding PrefixCachingIndex}" />
+            </Grid>
+            <Grid ColumnDefinitions="220,*">
+              <TextBlock Text="Served model name" VerticalAlignment="Center"
+                         ToolTip.Tip="vLLM --served-model-name. The id the API advertises at /v1/models instead of the full repo path — point an agent at a short, stable name (e.g. 'local'). Blank = serve under the model id." />
+              <TextBox Grid.Column="1" Text="{Binding ServedModelName}" Margin="0,2" PlaceholderText="(model id)" />
+            </Grid>
+          </StackPanel>
         </StackPanel>
 
         <StackPanel Spacing="8">

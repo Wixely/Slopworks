@@ -162,6 +162,55 @@ public sealed class ServerConfig
     /// when NVLink is present so the bridge is used. Disabling P2P also disables NVLink.
     /// </summary>
     public bool? DisableGpuP2P { get; set; }
+
+    /// <summary>
+    /// vLLM --dtype: weight/compute precision. "auto" (or blank) matches the checkpoint's own dtype
+    /// and is what you want almost always. "bfloat16"/"float16" force half precision; "float32" is
+    /// rarely wanted (doubles VRAM). Applies on CPU and GPU.
+    /// </summary>
+    public string Dtype { get; set; } = "auto";
+
+    /// <summary>
+    /// vLLM --trust-remote-code: allow the model repo to run its own modeling code. Required by some
+    /// architectures that ship custom Python. Off by default; only enable for repos you trust — it
+    /// executes code straight from the repo.
+    /// </summary>
+    public bool TrustRemoteCode { get; set; }
+
+    /// <summary>
+    /// vLLM --enforce-eager: disable CUDA-graph capture. Off keeps graphs (faster). On frees the VRAM
+    /// the graphs reserve and is a known requirement for long context under WSL2 — a direct OOM lever
+    /// at the cost of some throughput.
+    /// </summary>
+    public bool EnforceEager { get; set; }
+
+    /// <summary>
+    /// vLLM --max-num-seqs: cap on sequences batched concurrently. null = vLLM's default (256).
+    /// Lower it (e.g. 1–2) so a single long-context request can claim more of the KV cache; it's a
+    /// cap, not a reservation, so short requests are unaffected.
+    /// </summary>
+    public int? MaxNumSeqs { get; set; }
+
+    /// <summary>
+    /// vLLM --max-num-batched-tokens: chunked-prefill token budget per step. null = vLLM's default.
+    /// Lower it to soften prefill/decode starvation when long prompts and active generations share
+    /// the GPU; raise it to speed bulk prefill. Advanced.
+    /// </summary>
+    public int? MaxNumBatchedTokens { get; set; }
+
+    /// <summary>
+    /// vLLM prefix caching. null = leave vLLM's default (on in current versions); true/false force
+    /// --enable-prefix-caching / --no-enable-prefix-caching. Caching shared prompt prefixes is a big
+    /// win for agents that reuse a system prompt; force off only to isolate a caching issue. Advanced.
+    /// </summary>
+    public bool? EnablePrefixCaching { get; set; }
+
+    /// <summary>
+    /// vLLM --served-model-name: the id the API advertises at /v1/models instead of the full repo
+    /// path, so an agent can target a short, stable name (e.g. "local"). null/blank = serve under the
+    /// model id. Advanced.
+    /// </summary>
+    public string? ServedModelName { get; set; }
 }
 
 public sealed class ImagesConfig

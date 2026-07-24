@@ -390,4 +390,240 @@ public class VllmServerControllerTests
         Assert.DoesNotContain("hf_supersecret", command);
         Assert.Contains("HUGGING_FACE_HUB_TOKEN", command); // env-var indirection instead
     }
+
+    [Fact]
+    public void Defaults_OmitAllOptionalTuningFlags()
+    {
+        var command = Build(new SlopworksConfig()).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.DoesNotContain("--dtype", command);
+        Assert.DoesNotContain("--trust-remote-code", command);
+        Assert.DoesNotContain("--enforce-eager", command);
+        Assert.DoesNotContain("--max-num-seqs", command);
+        Assert.DoesNotContain("--max-num-batched-tokens", command);
+        Assert.DoesNotContain("prefix-caching", command);
+        Assert.DoesNotContain("--served-model-name", command);
+    }
+
+    [Theory]
+    [InlineData("bfloat16")]
+    [InlineData("float16")]
+    public void Dtype_Explicit_AddsTheFlag(string dtype)
+    {
+        var config = new SlopworksConfig();
+        config.Server.Dtype = dtype;
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains($"--dtype {dtype}", command);
+    }
+
+    [Fact]
+    public void Dtype_Auto_OmitsTheFlag()
+    {
+        var config = new SlopworksConfig();
+        config.Server.Dtype = "auto";
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.DoesNotContain("--dtype", command);
+    }
+
+    [Fact]
+    public void Dtype_DefersToExtraArgs_NoDuplicateFlag()
+    {
+        var config = new SlopworksConfig();
+        config.Server.Dtype = "bfloat16";
+        config.Server.ExtraArgs = ["--dtype float16"]; // user's explicit value wins
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains("--dtype float16", command);
+        Assert.DoesNotContain("--dtype bfloat16", command);
+    }
+
+    [Fact]
+    public void TrustRemoteCode_WhenSet_AddsTheFlag()
+    {
+        var config = new SlopworksConfig();
+        config.Server.TrustRemoteCode = true;
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains("--trust-remote-code", command);
+    }
+
+    [Fact]
+    public void EnforceEager_WhenSet_AddsTheFlag()
+    {
+        var config = new SlopworksConfig();
+        config.Server.EnforceEager = true;
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains("--enforce-eager", command);
+    }
+
+    [Fact]
+    public void MaxNumSeqs_WhenSet_AddsTheFlag_AndDefersToExtraArgs()
+    {
+        var config = new SlopworksConfig();
+        config.Server.MaxNumSeqs = 2;
+
+        Assert.Contains("--max-num-seqs 2", Build(config).BuildRunCommand(GpuProfile, "org/model"));
+
+        config.Server.ExtraArgs = ["--max-num-seqs 8"]; // user's explicit value wins
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+        Assert.Contains("--max-num-seqs 8", command);
+        Assert.DoesNotContain("--max-num-seqs 2", command);
+    }
+
+    [Fact]
+    public void MaxNumBatchedTokens_WhenSet_AddsTheFlag()
+    {
+        var config = new SlopworksConfig();
+        config.Server.MaxNumBatchedTokens = 4128;
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains("--max-num-batched-tokens 4128", command);
+    }
+
+    [Fact]
+    public void PrefixCaching_True_AddsEnable_False_AddsNoEnable_Null_Omits()
+    {
+        var on = new SlopworksConfig();
+        on.Server.EnablePrefixCaching = true;
+        var onCmd = Build(on).BuildRunCommand(GpuProfile, "org/model");
+        Assert.Contains("--enable-prefix-caching", onCmd);
+        Assert.DoesNotContain("--no-enable-prefix-caching", onCmd);
+
+        var off = new SlopworksConfig();
+        off.Server.EnablePrefixCaching = false;
+        Assert.Contains("--no-enable-prefix-caching", Build(off).BuildRunCommand(GpuProfile, "org/model"));
+
+        // null (default) leaves vLLM's own default — neither flag.
+        Assert.DoesNotContain("prefix-caching", Build(new SlopworksConfig()).BuildRunCommand(GpuProfile, "org/model"));
+    }
+
+    [Fact]
+    public void ServedModelName_WhenSet_AddsTheFlag()
+    {
+        var config = new SlopworksConfig();
+        config.Server.ServedModelName = "local";
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains("--served-model-name local", command);
+    }
+
+    [Fact]
+    public void OptionalTuningFlags_AlsoApplyInCpuMode()
+    {
+        var config = new SlopworksConfig();
+        config.Server.EnforceEager = true;
+        config.Server.Dtype = "bfloat16";
+
+        var command = Build(config).BuildRunCommand(new SystemProfile(), "org/model");
+
+        Assert.Contains("--enforce-eager", command);
+        Assert.Contains("--dtype bfloat16", command);
+    }
+
+    /// <summary>
+    /// Builds a controller whose data root has the given template on disk and links a model to it in
+    /// the library (models.json) — which is how the controller resolves the model's --chat-template.
+    /// Pass templateContent=null to link a model to a template name whose file does NOT exist.
+    /// </summary>
+    private static (VllmServerController controller, string dir) BuildWithModelTemplate(
+        SlopworksConfig config, string modelId, string? templateName, string? templateContent)
+    {
+        var dir = Directory.CreateTempSubdirectory("slopworks-tpl-").FullName;
+        var paths = new SlopworksPaths(dir);
+        if (templateName is not null && templateContent is not null)
+            new TemplateStore(paths).Create(templateName, templateContent);
+        var store = new ModelLibraryStore(paths);
+        var doc = store.Load();
+        doc.Models.Add(new ModelEntry { Id = modelId, ChatTemplate = templateName });
+        store.Save(doc);
+        return (new VllmServerController(new WslLinuxCommandFactory(SlopworksPaths.DistroName), config, new HttpClient(), paths), dir);
+    }
+
+    [Fact]
+    public void ChatTemplate_WhenModelHasOneAndFileExists_MountsItAndPassesTheFlag()
+    {
+        var (controller, dir) = BuildWithModelTemplate(new SlopworksConfig(), "org/model", "qwen-fixed", "{{ messages }}");
+        try
+        {
+            var command = controller.BuildRunCommand(GpuProfile, "org/model");
+
+            Assert.Contains("--chat-template", command);
+            Assert.Contains("qwen-fixed.jinja", command);
+            Assert.Contains(":ro", command); // mounted read-only
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void ChatTemplate_MissingFile_OmitsMountAndFlag()
+    {
+        // The model references a template whose file isn't on disk — a dangling reference must not break the run.
+        var (controller, dir) = BuildWithModelTemplate(new SlopworksConfig(), "org/model", "does-not-exist", null);
+        try
+        {
+            var command = controller.BuildRunCommand(GpuProfile, "org/model");
+
+            Assert.DoesNotContain("--chat-template", command);
+            Assert.DoesNotContain("does-not-exist", command);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void ChatTemplate_ModelWithoutOne_OmitsTheFlag()
+    {
+        var (controller, dir) = BuildWithModelTemplate(new SlopworksConfig(), "org/model", null, null);
+        try
+        {
+            Assert.DoesNotContain("--chat-template", controller.BuildRunCommand(GpuProfile, "org/model"));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void ChatTemplate_ResolvesPerModel_NotForOtherModels()
+    {
+        var dir = Directory.CreateTempSubdirectory("slopworks-tpl-").FullName;
+        try
+        {
+            var paths = new SlopworksPaths(dir);
+            new TemplateStore(paths).Create("t-a", "a");
+            var store = new ModelLibraryStore(paths);
+            var doc = store.Load();
+            doc.Models.Add(new ModelEntry { Id = "org/a", ChatTemplate = "t-a" });
+            doc.Models.Add(new ModelEntry { Id = "org/b", ChatTemplate = null });
+            store.Save(doc);
+            var controller = new VllmServerController(new WslLinuxCommandFactory(SlopworksPaths.DistroName), new SlopworksConfig(), new HttpClient(), paths);
+
+            Assert.Contains("t-a.jinja", controller.BuildRunCommand(GpuProfile, "org/a"));
+            Assert.DoesNotContain("--chat-template", controller.BuildRunCommand(GpuProfile, "org/b"));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void ChatTemplate_DefersToExtraArgs_NoDuplicateFlag()
+    {
+        var config = new SlopworksConfig();
+        config.Server.ExtraArgs = ["--chat-template /my/own.jinja"]; // user's explicit value wins
+        var (controller, dir) = BuildWithModelTemplate(config, "org/model", "qwen-fixed", "body");
+        try
+        {
+            var command = controller.BuildRunCommand(GpuProfile, "org/model");
+
+            Assert.Contains("--chat-template /my/own.jinja", command);
+            Assert.DoesNotContain("qwen-fixed.jinja", command); // managed flag suppressed
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }

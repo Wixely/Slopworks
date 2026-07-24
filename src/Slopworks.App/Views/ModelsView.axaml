@@ -65,6 +65,13 @@
                                    FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
             </DockPanel>
 
+            <Grid ColumnDefinitions="Auto,*">
+              <TextBlock Grid.Column="0" Text="Chat template" VerticalAlignment="Center" Margin="0,0,10,0"
+                         ToolTip.Tip="The chat template vLLM uses for this model (--chat-template), saved with the model. Add or edit templates on the Templates tab; 'None' uses the model's built-in template." />
+              <ComboBox Grid.Column="1" HorizontalAlignment="Left" MinWidth="260"
+                        ItemsSource="{Binding TemplateOptions}" SelectedItem="{Binding SelectedModelTemplate}" />
+            </Grid>
+
             <DockPanel>
               <Button DockPanel.Dock="Right" Content="Save notes" Command="{Binding SaveNotesCommand}" />
               <TextBlock Text="Notes" FontWeight="SemiBold" Opacity="0.85" VerticalAlignment="Center" />

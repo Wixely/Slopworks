@@ -44,7 +44,8 @@ Pump();
     (4, "models.png"),
     (5, "settings.png"),
     (6, "platform.png"),
-    (7, "maintenance.png"),
+    (7, "templates.png"),
+    (8, "maintenance.png"),
 ];
 
 foreach (var (tab, file) in shots)
@@ -150,6 +151,11 @@ static void Seed(SlopworksHost host)
         "gguf", null, null, null, null, "text-generation", "llama2", 480_000,
         "GGUF — run this one in Ollama, not vLLM.");
     host.Models.Save();
+
+    // A chat template, attached to the current server model.
+    new TemplateStore(host.Paths).Create("custom-chatml",
+        "{%- for message in messages -%}\n  {{- '<|im_start|>' + message.role + '\\n' + message.content + '<|im_end|>\\n' -}}\n{%- endfor -%}\n{{- '<|im_start|>assistant\\n' -}}\n");
+    host.Models.SetActiveModelTemplate("custom-chatml");
 }
 
 static void AddModel(SlopworksHost host, string id, string verdict, string summary, string detail,

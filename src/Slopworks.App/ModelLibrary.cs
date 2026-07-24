@@ -21,6 +21,8 @@ public sealed class ModelLibrary
         _profiles = profiles;
         _doc = _store.Load();
         EnsureContains(config.Server.Model); // the default/active model is always in the library
+        // Each profile has its own model — keep whichever is active present in the library on switch.
+        _profiles.Changed += () => EnsureContains(_config.Server.Model);
     }
 
     /// <summary>Make sure a model id exists in the library (adds it if missing), so pickers can show it.</summary>
@@ -91,5 +93,52 @@ public sealed class ModelLibrary
     {
         _config.Server.Model = (id ?? "").Trim();
         _profiles.SaveActive();
+    }
+
+    /// <summary>The library entry for the model the server is currently set to use (or null).</summary>
+    public ModelEntry? ActiveModel =>
+        _doc.Models.FirstOrDefault(m => m.Id.Equals(_config.Server.Model, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The chat template attached to the current server model (null = the model's built-in).</summary>
+    public string? ActiveModelTemplate => ActiveModel?.ChatTemplate;
+
+    /// <summary>Attach (or clear) a chat template on a specific model and persist models.json.</summary>
+    public void SetTemplate(ModelEntry entry, string? template)
+    {
+        entry.ChatTemplate = string.IsNullOrWhiteSpace(template) ? null : template;
+        Save();
+    }
+
+    /// <summary>Attach (or clear) the chat template on the current server model. No-op if none is set.</summary>
+    public void SetActiveModelTemplate(string? template)
+    {
+        if (ActiveModel is { } entry)
+            SetTemplate(entry, template);
+    }
+
+    /// <summary>Repoint every model that referenced a renamed template at the new name.</summary>
+    public void RenameTemplateReferences(string oldName, string newName)
+    {
+        var changed = false;
+        foreach (var m in _doc.Models.Where(m => string.Equals(m.ChatTemplate, oldName, StringComparison.Ordinal)))
+        {
+            m.ChatTemplate = newName;
+            changed = true;
+        }
+        if (changed)
+            Save();
+    }
+
+    /// <summary>Clear the template reference from every model that used a now-deleted template.</summary>
+    public void ClearTemplateReferences(string name)
+    {
+        var changed = false;
+        foreach (var m in _doc.Models.Where(m => string.Equals(m.ChatTemplate, name, StringComparison.Ordinal)))
+        {
+            m.ChatTemplate = null;
+            changed = true;
+        }
+        if (changed)
+            Save();
     }
 }

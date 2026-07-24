@@ -24,6 +24,45 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
         ? "/opt/slopworks/hf"
         : Path.Combine(paths.Root, "hf");
 
+    /// <summary>
+    /// Directory the chat-template file is mounted from inside the container. On Windows the file is
+    /// copied into the distro at start (the Windows data folder isn't visible to the container); on a
+    /// Linux host the native templates dir is mounted directly.
+    /// </summary>
+    public string TemplatesContainerDir => OperatingSystem.IsWindows()
+        ? "/opt/slopworks/templates"
+        : paths.TemplatesDir;
+
+    /// <summary>
+    /// The chat-template file to use for a given model — the template attached to that model in the
+    /// library (models.json) — if one is set AND the file exists on disk; otherwise null (so a model
+    /// with no template, or a dangling reference, just runs with vLLM's built-in template).
+    /// </summary>
+    private string? SelectedTemplateFile(string model)
+    {
+        var wanted = ModelId.Normalize(model);
+        if (wanted.Length == 0)
+            return null;
+
+        string? templateName;
+        try
+        {
+            var library = new ModelLibraryStore(paths).Load();
+            templateName = library.Models
+                .FirstOrDefault(m => ModelId.Normalize(m.Id).Equals(wanted, StringComparison.OrdinalIgnoreCase))
+                ?.ChatTemplate;
+        }
+        catch (Exception)
+        {
+            return null; // a missing/corrupt library just means no template override
+        }
+
+        if (string.IsNullOrWhiteSpace(templateName))
+            return null;
+        var file = ProfileStore.Clean(templateName) + ".jinja";
+        return File.Exists(Path.Combine(paths.TemplatesDir, file)) ? file : null;
+    }
+
     public string BaseUrl => $"http://localhost:{config.Server.Port}";
 
     public string SelectImage(SystemProfile profile) => profile.GpuPresent ? config.Images.Gpu : config.Images.Cpu;
@@ -51,6 +90,10 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
             publish,
             $"-v {HfCachePath}:/root/.cache/huggingface",
         };
+
+        // Mount the model's chat template (read-only) so --chat-template can point at it.
+        if (SelectedTemplateFile(model) is not null)
+            args.Add($"-v {TemplatesContainerDir}:{TemplatesContainerDir}:ro");
 
         if (config.Server.HfToken is { Length: > 0 })
             args.Add("-e HUGGING_FACE_HUB_TOKEN=\"$HF_TOKEN\""); // injected via env, kept out of the visible command
@@ -119,6 +162,40 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
             && !UserSet("--kv-cache-dtype"))
             args.Add($"--kv-cache-dtype {kvDtype}");
 
+        // Weight/compute precision. "auto" (or blank) matches the checkpoint — the usual choice.
+        if (config.Server.Dtype is { Length: > 0 } dtype && !dtype.Equals("auto", StringComparison.OrdinalIgnoreCase)
+            && !UserSet("--dtype"))
+            args.Add($"--dtype {dtype}");
+
+        // Some architectures ship custom modeling code and won't load without this.
+        if (config.Server.TrustRemoteCode && !UserSet("--trust-remote-code"))
+            args.Add("--trust-remote-code");
+
+        // Disable CUDA graphs: frees the VRAM they reserve; a documented long-context requirement on WSL2.
+        if (config.Server.EnforceEager && !UserSet("--enforce-eager"))
+            args.Add("--enforce-eager");
+
+        // Concurrency cap. Lower it so one long-context request can claim more KV cache.
+        if (config.Server.MaxNumSeqs is { } maxSeqs && maxSeqs > 0 && !UserSet("--max-num-seqs"))
+            args.Add($"--max-num-seqs {maxSeqs}");
+
+        // Chunked-prefill token budget per step.
+        if (config.Server.MaxNumBatchedTokens is { } maxBatched && maxBatched > 0 && !UserSet("--max-num-batched-tokens"))
+            args.Add($"--max-num-batched-tokens {maxBatched}");
+
+        // Prefix caching: null leaves vLLM's own default; true/false force the matching flag.
+        if (config.Server.EnablePrefixCaching is { } prefixCaching
+            && !UserSet("--enable-prefix-caching") && !UserSet("--no-enable-prefix-caching"))
+            args.Add(prefixCaching ? "--enable-prefix-caching" : "--no-enable-prefix-caching");
+
+        // Advertise a short, stable id at /v1/models instead of the full repo path.
+        if (config.Server.ServedModelName is { Length: > 0 } servedName && !UserSet("--served-model-name"))
+            args.Add($"--served-model-name {servedName}");
+
+        // A corrected chat template (mounted above) overriding the model's built-in prompt format.
+        if (SelectedTemplateFile(model) is { } chatTemplate && !UserSet("--chat-template"))
+            args.Add($"--chat-template {TemplatesContainerDir}/{chatTemplate}");
+
         if (profile.GpuPresent)
         {
             if (!UserSet("--gpu-memory-utilization"))
@@ -153,7 +230,19 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
         IProcessRunner processes, SystemProfile profile, string model,
         IProgress<string>? output, CancellationToken ct)
     {
-        var command = $"mkdir -p {HfCachePath} && {BuildRunCommand(profile, model)}";
+        var prep = new List<string> { $"mkdir -p {HfCachePath}" };
+
+        // On Windows the container can't see the Windows data folder, so copy the model's template
+        // into the distro first. base64 over the command line sidesteps all Jinja/shell escaping.
+        if (OperatingSystem.IsWindows() && SelectedTemplateFile(model) is { } tplFile)
+        {
+            var content = await File.ReadAllTextAsync(Path.Combine(paths.TemplatesDir, tplFile), ct);
+            var b64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(content));
+            prep.Add($"mkdir -p {TemplatesContainerDir}");
+            prep.Add($"printf %s '{b64}' | base64 -d > {TemplatesContainerDir}/{tplFile}");
+        }
+
+        var command = $"{string.Join(" && ", prep)} && {BuildRunCommand(profile, model)}";
         var spec = linux.Command(command);
         if (config.Server.HfToken is { Length: > 0 } token)
         {
