@@ -399,6 +399,7 @@ public class VllmServerControllerTests
         Assert.DoesNotContain("--dtype", command);
         Assert.DoesNotContain("--trust-remote-code", command);
         Assert.DoesNotContain("--enforce-eager", command);
+        Assert.DoesNotContain("cudagraph_mode", command);
         Assert.DoesNotContain("--max-num-seqs", command);
         Assert.DoesNotContain("--max-num-batched-tokens", command);
         Assert.DoesNotContain("prefix-caching", command);
@@ -462,6 +463,30 @@ public class VllmServerControllerTests
         var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
 
         Assert.Contains("--enforce-eager", command);
+    }
+
+    [Fact]
+    public void CudaGraphModeNone_WhenSet_AddsTheFlag()
+    {
+        var config = new SlopworksConfig();
+        config.Server.CudaGraphModeNone = true;
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains("-cc.cudagraph_mode=NONE", command);
+    }
+
+    [Fact]
+    public void CudaGraphModeNone_DefersWhenUserSetsCudagraphModeThemselves()
+    {
+        var config = new SlopworksConfig();
+        config.Server.CudaGraphModeNone = true;
+        config.Server.ExtraArgs = ["-cc.cudagraph_mode=FULL"]; // user's own value wins
+
+        var command = Build(config).BuildRunCommand(GpuProfile, "org/model");
+
+        Assert.Contains("-cc.cudagraph_mode=FULL", command);
+        Assert.DoesNotContain("-cc.cudagraph_mode=NONE", command);
     }
 
     [Fact]

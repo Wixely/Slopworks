@@ -178,11 +178,20 @@ public sealed class ServerConfig
     public bool TrustRemoteCode { get; set; }
 
     /// <summary>
-    /// vLLM --enforce-eager: disable CUDA-graph capture. Off keeps graphs (faster). On frees the VRAM
-    /// the graphs reserve and is a known requirement for long context under WSL2 — a direct OOM lever
-    /// at the cost of some throughput.
+    /// vLLM --enforce-eager: run fully eager — turns off BOTH torch.compile and CUDA graphs. Frees the
+    /// VRAM the graphs reserve (a known long-context requirement under WSL2) and is the most compatible,
+    /// but the slowest. For just the CUDA-graph part while keeping torch.compile, use
+    /// <see cref="CudaGraphModeNone"/> instead.
     /// </summary>
     public bool EnforceEager { get; set; }
+
+    /// <summary>
+    /// vLLM -cc.cudagraph_mode=NONE: disable CUDA-graph capture ONLY, while keeping torch.compile and
+    /// its kernel optimizations. A lighter alternative to <see cref="EnforceEager"/> — it frees the same
+    /// CUDA-graph VRAM and sidesteps graph-capture problems, but stays faster than full eager because
+    /// compilation still runs. Off by default.
+    /// </summary>
+    public bool CudaGraphModeNone { get; set; }
 
     /// <summary>
     /// vLLM --max-num-seqs: cap on sequences batched concurrently. null = vLLM's default (256).

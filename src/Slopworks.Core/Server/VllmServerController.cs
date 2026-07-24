@@ -175,6 +175,12 @@ public sealed class VllmServerController(ILinuxCommandFactory linux, SlopworksCo
         if (config.Server.EnforceEager && !UserSet("--enforce-eager"))
             args.Add("--enforce-eager");
 
+        // Disable CUDA graphs only (keep torch.compile) — a lighter alternative to --enforce-eager.
+        // De-dup on the field name so any user form (-cc./-O./--compilation-config) wins.
+        if (config.Server.CudaGraphModeNone
+            && !config.Server.ExtraArgs.Any(a => a.Contains("cudagraph_mode", StringComparison.OrdinalIgnoreCase)))
+            args.Add("-cc.cudagraph_mode=NONE");
+
         // Concurrency cap. Lower it so one long-context request can claim more KV cache.
         if (config.Server.MaxNumSeqs is { } maxSeqs && maxSeqs > 0 && !UserSet("--max-num-seqs"))
             args.Add($"--max-num-seqs {maxSeqs}");

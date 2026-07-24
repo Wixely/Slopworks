@@ -191,6 +191,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
     [ObservableProperty] private string _dtype = "auto";
     [ObservableProperty] private string _maxNumSeqs = "";
     [ObservableProperty] private bool _enforceEager;
+    [ObservableProperty] private bool _cudaGraphModeNone;
     [ObservableProperty] private bool _trustRemoteCode;
 
     // Advanced group, revealed by ShowAdvancedServer.
@@ -394,6 +395,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         Dtype = string.IsNullOrWhiteSpace(config.Server.Dtype) ? "auto" : config.Server.Dtype;
         MaxNumSeqs = config.Server.MaxNumSeqs?.ToString() ?? "";
         EnforceEager = config.Server.EnforceEager;
+        CudaGraphModeNone = config.Server.CudaGraphModeNone;
         TrustRemoteCode = config.Server.TrustRemoteCode;
         MaxNumBatchedTokens = config.Server.MaxNumBatchedTokens?.ToString() ?? "";
         PrefixCachingIndex = config.Server.EnablePrefixCaching switch { true => 1, false => 2, _ => 0 };
@@ -443,6 +445,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         config.Server.Dtype = string.IsNullOrWhiteSpace(Dtype) ? "auto" : Dtype;
         config.Server.MaxNumSeqs = maxNumSeqs;
         config.Server.EnforceEager = EnforceEager;
+        config.Server.CudaGraphModeNone = CudaGraphModeNone;
         config.Server.TrustRemoteCode = TrustRemoteCode;
         config.Server.MaxNumBatchedTokens = maxNumBatchedTokens;
         config.Server.EnablePrefixCaching = PrefixCachingChoice();
@@ -478,6 +481,10 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
         StatusText = "Edits discarded.";
     }
 
+    /// <summary>Preset buttons beside the tool-call-parser field fill it in; it stays fully typeable.</summary>
+    [RelayCommand]
+    private void SetToolParser(string? value) => ToolCallParser = value ?? "";
+
     private void UpdatePreview()
     {
         if (!TryValidate(out var port, out var gpuMem, out var maxModelLen, out var maxNumSeqs, out var maxNumBatchedTokens, out var error))
@@ -501,6 +508,7 @@ public partial class SettingsViewModel : ObservableObject, IActivatableTab
                 Dtype = string.IsNullOrWhiteSpace(Dtype) ? "auto" : Dtype,
                 MaxNumSeqs = maxNumSeqs,
                 EnforceEager = EnforceEager,
+                CudaGraphModeNone = CudaGraphModeNone,
                 TrustRemoteCode = TrustRemoteCode,
                 MaxNumBatchedTokens = maxNumBatchedTokens,
                 EnablePrefixCaching = PrefixCachingChoice(),

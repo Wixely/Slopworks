@@ -91,8 +91,12 @@
           </Grid>
 
           <CheckBox IsChecked="{Binding EnforceEager}"
-                    Content="Disable CUDA graphs (--enforce-eager)"
-                    ToolTip.Tip="Frees the VRAM that CUDA-graph capture reserves and is a documented requirement for long context under WSL2. Costs some throughput — turn on if you hit OOM near your context limit." />
+                    Content="Run fully eager (--enforce-eager)"
+                    ToolTip.Tip="Turns off BOTH torch.compile and CUDA graphs — the most compatible but slowest. Frees the CUDA-graph VRAM (a documented WSL2 long-context requirement). To keep torch.compile and drop only CUDA graphs, use the option below instead." />
+
+          <CheckBox IsChecked="{Binding CudaGraphModeNone}"
+                    Content="Disable CUDA graphs only, keep torch.compile (-cc.cudagraph_mode=NONE)"
+                    ToolTip.Tip="Disables only CUDA-graph capture while torch.compile and its kernel optimizations stay on — a lighter alternative to --enforce-eager. Frees the same CUDA-graph VRAM and avoids graph-capture issues, but stays faster than full eager." />
 
           <CheckBox IsChecked="{Binding TrustRemoteCode}"
                     Content="Trust remote code (--trust-remote-code)"
@@ -103,8 +107,22 @@
                     ToolTip.Tip="Agents that send tools with tool_choice=auto need this, or vLLM returns 400. On by default." />
           <Grid ColumnDefinitions="220,*" IsVisible="{Binding EnableToolCalling}">
             <TextBlock Text="Tool call parser" VerticalAlignment="Center"
-                       ToolTip.Tip="--tool-call-parser, must match the model's tool format. Common: hermes (Qwen/Hermes), llama3_json, mistral, pythonic, qwen3_coder." />
-            <TextBox Grid.Column="1" Text="{Binding ToolCallParser}" Margin="0,2" PlaceholderText="hermes" />
+                       ToolTip.Tip="--tool-call-parser, must match the model's tool format. Type any value, or pick a preset. Common: hermes (Qwen/Hermes), llama3_json, mistral, pythonic, qwen3_coder." />
+            <DockPanel Grid.Column="1" Margin="0,2">
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" Margin="6,0,0,0">
+                <Button Content="hermes" Command="{Binding SetToolParserCommand}" CommandParameter="hermes"
+                        Padding="8,3" FontSize="12" ToolTip.Tip="Qwen / Hermes (most Qwen2.5 / Qwen3 models)" />
+                <Button Content="llama3_json" Command="{Binding SetToolParserCommand}" CommandParameter="llama3_json"
+                        Padding="8,3" FontSize="12" ToolTip.Tip="Llama 3.1 / 3.2" />
+                <Button Content="mistral" Command="{Binding SetToolParserCommand}" CommandParameter="mistral"
+                        Padding="8,3" FontSize="12" ToolTip.Tip="Mistral / Mixtral" />
+                <Button Content="pythonic" Command="{Binding SetToolParserCommand}" CommandParameter="pythonic"
+                        Padding="8,3" FontSize="12" ToolTip.Tip="Llama 4 and other pythonic-format models" />
+                <Button Content="qwen3_coder" Command="{Binding SetToolParserCommand}" CommandParameter="qwen3_coder"
+                        Padding="8,3" FontSize="12" ToolTip.Tip="Qwen3 Coder" />
+              </StackPanel>
+              <TextBox Text="{Binding ToolCallParser}" PlaceholderText="hermes" VerticalAlignment="Center" />
+            </DockPanel>
           </Grid>
 
           <CheckBox IsChecked="{Binding ShowAdvancedServer}" Content="Show advanced vLLM options" Margin="0,4,0,0" />

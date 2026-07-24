@@ -40,8 +40,6 @@
           <Button Content="Refresh" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsBusy}" />
           <Button Content="{Binding LiveLogsLabel}" Command="{Binding ToggleLiveLogsCommand}"
                   ToolTip.Tip="Stream the vLLM container log below, updating every 2s. Also saved to the Logs tab." />
-          <Button Content="Copy logs" Click="CopyLogs_Click"
-                  ToolTip.Tip="Copy the full log text below to the clipboard" />
           <Button Content="Fix port forwarding" Command="{Binding RepairForwardingCommand}" IsEnabled="{Binding !IsBusy}"
                   ToolTip.Tip="Restarts WSL — use when localhost stops responding after the machine slept" />
         </StackPanel>
@@ -131,13 +129,20 @@
       </StackPanel>
     </Grid>
 
-    <!-- Bottom: the live log -->
-    <Border Grid.Row="1" Background="#18000000" CornerRadius="8" Padding="10">
-      <ScrollViewer Name="LogScroller">
-        <SelectableTextBlock Text="{Binding Logs}" FontFamily="Consolas,Menlo,monospace" FontSize="12" Opacity="0.85"
-                             TextWrapping="NoWrap" />
-      </ScrollViewer>
-    </Border>
+    <!-- Bottom: the live log, with a Copy button on its header -->
+    <Grid Grid.Row="1" RowDefinitions="Auto,*">
+      <DockPanel Grid.Row="0" Margin="0,0,0,6">
+        <Button DockPanel.Dock="Right" Content="Copy logs" Click="CopyLogs_Click"
+                ToolTip.Tip="Copy the full log text below to the clipboard" />
+        <TextBlock Text="Live log" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
+      </DockPanel>
+      <Border Grid.Row="1" Background="#18000000" CornerRadius="8" Padding="10">
+        <ScrollViewer Name="LogScroller">
+          <SelectableTextBlock Text="{Binding Logs}" FontFamily="Consolas,Menlo,monospace" FontSize="12" Opacity="0.85"
+                               TextWrapping="NoWrap" />
+        </ScrollViewer>
+      </Border>
+    </Grid>
 
   </Grid>
 </UserControl>
