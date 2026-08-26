@@ -45,6 +45,7 @@ jobs:
         with:
           name: test-results-${{ matrix.os }}
           path: '**/TestResults/*.trx'
+          retention-days: 7
 
       - name: Publish single-file app (win-x64)
         if: runner.os == 'Windows'
@@ -71,6 +72,7 @@ jobs:
         with:
           name: Slopworks-${{ runner.os == 'Windows' && 'win-x64' || 'linux-x64' }}
           path: publish/
+          retention-days: 3
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
